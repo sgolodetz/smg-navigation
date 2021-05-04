@@ -1,6 +1,6 @@
 import numpy as np
 
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from smg.pyoctomap import OcTree, OcTreeNode, Vector3
 
@@ -16,19 +16,29 @@ class AStarPathPlanner:
     # PUBLIC METHODS
 
     def plan_path(self, *, start, goal) -> List[np.ndarray]:
-        start_coords: Vector3 = self.__pos_to_coords(Vector3(*start))
-        goal_coords: Vector3 = self.__pos_to_coords(Vector3(*goal))
+        # See: https://en.wikipedia.org/wiki/A*_search_algorithm
+        start_coords: Tuple[int, int, int] = self.__pos_to_coords(Vector3(*start))
+        goal_coords: Tuple[int, int, int] = self.__pos_to_coords(Vector3(*goal))
+
         print(start_coords, self.__occupancy_status(start_coords))
         print(goal_coords, self.__occupancy_status(goal_coords))
+
+        # TODO
+
         return []
 
     # PRIVATE METHODS
 
-    def __coords_to_vpos(self, voxel_coords: Vector3) -> Vector3:
+    def __coords_to_vpos(self, coords: Tuple[int, int, int]) -> Vector3:
         voxel_size: float = self.__tree.get_resolution()
-        return voxel_coords * voxel_size
+        half_voxel_size: float = voxel_size / 2.0
+        return Vector3(
+            coords[0] * voxel_size + half_voxel_size,
+            coords[1] * voxel_size + half_voxel_size,
+            coords[2] * voxel_size + half_voxel_size
+        )
 
-    def __occupancy_status(self, coords: Vector3) -> str:
+    def __occupancy_status(self, coords: Tuple[int, int, int]) -> str:
         vpos: Vector3 = self.__coords_to_vpos(coords)
         node: Optional[OcTreeNode] = self.__tree.search(vpos)
         if node is None:
@@ -37,14 +47,9 @@ class AStarPathPlanner:
             occupied: bool = self.__tree.is_node_occupied(node)
             return "Occupied" if occupied else "Free"
 
-    def __pos_to_coords(self, pos: Vector3) -> Vector3:
+    def __pos_to_coords(self, pos: Vector3) -> Tuple[int, int, int]:
         voxel_size: float = self.__tree.get_resolution()
-        return Vector3(pos.x // voxel_size, pos.y // voxel_size, pos.z // voxel_size)
-
-    def __pos_to_vpos(self, pos: Vector3) -> Vector3:
-        voxel_size: float = self.__tree.get_resolution()
-        half_voxel_size: float = voxel_size / 2.0
-        x: float = (pos.x // voxel_size) * voxel_size + half_voxel_size
-        y: float = (pos.y // voxel_size) * voxel_size + half_voxel_size
-        z: float = (pos.z // voxel_size) * voxel_size + half_voxel_size
-        return Vector3(x, y, z)
+        return \
+            int(np.round(pos.x // voxel_size)), \
+            int(np.round(pos.y // voxel_size)), \
+            int(np.round(pos.z // voxel_size))
