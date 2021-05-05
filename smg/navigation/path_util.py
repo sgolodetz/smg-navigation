@@ -33,10 +33,18 @@ class PathUtil:
         source_node: PathNode = PathUtil.pos_to_node(PathUtil.from_numpy(path[source, :]), tree)
         dest_node: PathNode = PathUtil.pos_to_node(PathUtil.from_numpy(path[dest, :]), tree)
 
-        print(source_node)
-        print(dest_node)
+        source_vpos: Vector3 = PathUtil.node_to_vpos(source_node, tree)
+        dest_vpos: Vector3 = PathUtil.node_to_vpos(dest_node, tree)
 
-        # TODO
+        # TODO: Fix and optimise this.
+        prev_node: Optional[PathNode] = None
+        for t in np.linspace(0.0, 1.0, 101):
+            pos: Vector3 = source_vpos * (1 - t) + dest_vpos * t
+            node: PathNode = PathUtil.pos_to_node(pos, tree)
+            if prev_node is None or node != prev_node:
+                prev_node = node
+                if PathUtil.occupancy_status(node, tree) != "Free":
+                    return False
 
         return True
 
