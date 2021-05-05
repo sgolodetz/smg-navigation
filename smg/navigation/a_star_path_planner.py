@@ -48,7 +48,7 @@ class AStarPathPlanner:
 
     # PUBLIC METHODS
 
-    def plan_path(self, *, start, goal, d: Optional[Callable[[Vector3, Vector3], float]] = None,
+    def plan_path(self, *, source, goal, d: Optional[Callable[[Vector3, Vector3], float]] = None,
                   h: Optional[Callable[[Vector3, Vector3], float]] = None) -> Optional[Deque[np.ndarray]]:
         # Based on an amalgam of:
         #
@@ -60,28 +60,28 @@ class AStarPathPlanner:
         if h is None:
             h = self.__l2_distance
 
-        start_node: AStarPathPlanner.Node = self.__pos_to_node(Vector3(*start))
+        source_node: AStarPathPlanner.Node = self.__pos_to_node(Vector3(*source))
         goal_node: AStarPathPlanner.Node = self.__pos_to_node(Vector3(*goal))
 
-        start_vpos: Vector3 = self.__node_to_vpos(start_node)
+        source_vpos: Vector3 = self.__node_to_vpos(source_node)
         goal_vpos: Vector3 = self.__node_to_vpos(goal_node)
 
-        print(start, start_node, self.__occupancy_status(start_node))
+        print(source, source_node, self.__occupancy_status(source_node))
         print(goal, goal_node, self.__occupancy_status(goal_node))
 
         g_scores: Dict[AStarPathPlanner.Node, float] = defaultdict(lambda: np.infty)
-        g_scores[start_node] = 0.0
-        came_from: Dict[AStarPathPlanner.Node, Optional[AStarPathPlanner.Node]] = {start_node: None}
+        g_scores[source_node] = 0.0
+        came_from: Dict[AStarPathPlanner.Node, Optional[AStarPathPlanner.Node]] = {source_node: None}
 
         frontier: PriorityQueue[AStarPathPlanner.Node, float, type(None)] \
             = PriorityQueue[AStarPathPlanner.Node, float, type(None)]()
-        frontier.insert(start_node, h(start_vpos, goal_vpos), None)
+        frontier.insert(source_node, h(source_vpos, goal_vpos), None)
 
         while not frontier.empty():
             current_node: AStarPathPlanner.Node = frontier.top().ident
             if current_node == goal_node:
                 path: Deque[np.ndarray] = self.__reconstruct_path(goal_node, came_from)
-                path.appendleft(start)
+                path.appendleft(source)
                 path.append(goal)
                 return path
 
