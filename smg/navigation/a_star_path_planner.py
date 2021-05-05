@@ -49,7 +49,7 @@ class AStarPathPlanner:
     # PUBLIC METHODS
 
     def plan_path(self, *, source, goal, d: Optional[Callable[[Vector3, Vector3], float]] = None,
-                  h: Optional[Callable[[Vector3, Vector3], float]] = None) -> Optional[Deque[np.ndarray]]:
+                  h: Optional[Callable[[Vector3, Vector3], float]] = None) -> Optional[np.ndarray]:
         # Based on an amalgam of:
         #
         # 1) https://en.wikipedia.org/wiki/A*_search_algorithm
@@ -83,7 +83,7 @@ class AStarPathPlanner:
                 path: Deque[np.ndarray] = self.__reconstruct_path(goal_node, came_from)
                 path.appendleft(source)
                 path.append(goal)
-                return path
+                return np.vstack(path)
 
             frontier.pop()
             current_vpos: Vector3 = self.__node_to_vpos(current_node)
