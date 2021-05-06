@@ -3,7 +3,6 @@ import numpy as np
 from collections import defaultdict, deque
 from typing import Callable, Deque, Dict, Optional
 
-from smg.pyoctomap import OcTree
 from smg.utility import PriorityQueue
 
 from .planning_toolkit import PathNode, PlanningToolkit
@@ -14,9 +13,8 @@ class AStarPathPlanner:
 
     # CONSTRUCTOR
 
-    def __init__(self, tree: OcTree, toolkit: PlanningToolkit):
+    def __init__(self, toolkit: PlanningToolkit):
         self.__toolkit: PlanningToolkit = toolkit
-        self.__tree: OcTree = tree
 
     # PUBLIC METHODS
 
@@ -58,10 +56,12 @@ class AStarPathPlanner:
             current_node: PathNode = frontier.top().ident
             current_vpos: np.ndarray = self.__toolkit.node_to_vpos(current_node)
 
-            # if PathUtil.path_is_traversible(np.vstack([PathUtil.to_numpy(current_vpos), PathUtil.to_numpy(goal_vpos)]), 0, 1, self.__tree):
+            # if self.__toolkit.path_is_traversible(
+            #     np.vstack([current_vpos, goal_vpos]), 0, 1, use_clearance=use_clearance
+            # ):
             #     path: Deque[np.ndarray] = self.__reconstruct_path(current_node, came_from)
             #     path.appendleft(source)
-            #     path.append(PathUtil.node_to_vpos_np(current_node, self.__tree))
+            #     path.append(self.__toolkit.node_to_vpos(current_node))
             #     path.append(goal)
             #     return np.vstack(path)
 
