@@ -56,6 +56,15 @@ class AStarPathPlanner:
 
         while not frontier.empty():
             current_node: PathNode = frontier.top().ident
+            current_vpos: Vector3 = PathUtil.node_to_vpos(current_node, self.__tree)
+
+            # if PathUtil.path_is_traversible(np.vstack([PathUtil.to_numpy(current_vpos), PathUtil.to_numpy(goal_vpos)]), 0, 1, self.__tree):
+            #     path: Deque[np.ndarray] = self.__reconstruct_path(current_node, came_from)
+            #     path.appendleft(source)
+            #     path.append(PathUtil.node_to_vpos_np(current_node, self.__tree))
+            #     path.append(goal)
+            #     return np.vstack(path)
+
             if current_node == goal_node:
                 path: Deque[np.ndarray] = self.__reconstruct_path(goal_node, came_from)
                 path.appendleft(source)
@@ -63,7 +72,6 @@ class AStarPathPlanner:
                 return np.vstack(path)
 
             frontier.pop()
-            current_vpos: Vector3 = PathUtil.node_to_vpos(current_node, self.__tree)
 
             for neighbour_node in self.__neighbours(current_node):
                 if not self.__node_is_traversible(neighbour_node, use_clearance):
@@ -92,6 +100,10 @@ class AStarPathPlanner:
             for neighbour_node in self.__neighbours(node):
                 if not PathUtil.node_is_free(neighbour_node, self.__tree):
                     return False
+
+                # for nn_node in self.__neighbours(neighbour_node):
+                #     if not PathUtil.node_is_free(nn_node, self.__tree):
+                #         return False
 
         return True
 
