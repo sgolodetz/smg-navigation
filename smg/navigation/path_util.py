@@ -3,7 +3,7 @@ import numpy as np
 from smg.pyoctomap import OcTree, OcTreeNode, Vector3
 
 from scipy.interpolate import PchipInterpolator
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 
 # HELPER TYPES
@@ -16,6 +16,10 @@ PathNode = Tuple[int, int, int]
 class PathUtil:
     """Utility functions related to paths."""
 
+    # PUBLIC STATIC HOOKS
+
+    node_is_free: Callable[[PathNode, OcTree], bool] = lambda n, t: PathUtil.occupancy_status(n, t) == "Free"
+
     # PUBLIC STATIC METHODS
 
     @staticmethod
@@ -27,26 +31,6 @@ class PathUtil:
         x: np.ndarray = np.arange(len(path))
         cs: PchipInterpolator = PchipInterpolator(x, path)
         return cs(np.linspace(0, len(path) - 1, smoothed_length))
-
-    @staticmethod
-    def is_traversible(path: np.ndarray, source: int, dest: int, tree: OcTree) -> bool:
-        source_node: PathNode = PathUtil.pos_to_node(PathUtil.from_numpy(path[source, :]), tree)
-        dest_node: PathNode = PathUtil.pos_to_node(PathUtil.from_numpy(path[dest, :]), tree)
-
-        source_vpos: Vector3 = PathUtil.node_to_vpos(source_node, tree)
-        dest_vpos: Vector3 = PathUtil.node_to_vpos(dest_node, tree)
-
-        # TODO: Fix and optimise this.
-        prev_node: Optional[PathNode] = None
-        for t in np.linspace(0.0, 1.0, 101):
-            pos: Vector3 = source_vpos * (1 - t) + dest_vpos * t
-            node: PathNode = PathUtil.pos_to_node(pos, tree)
-            if prev_node is None or node != prev_node:
-                prev_node = node
-                if PathUtil.occupancy_status(node, tree) != "Free":
-                    return False
-
-        return True
 
     @staticmethod
     def l2_distance(v1: Vector3, v2: Vector3) -> float:
@@ -146,6 +130,27 @@ class PathUtil:
             return "Occupied" if occupied else "Free"
 
     @staticmethod
+    def path_is_traversible(path: np.ndarray, source: int, dest: int, tree: OcTree) -> bool:
+        source_node: PathNode = PathUtil.pos_to_node(PathUtil.from_numpy(path[source, :]), tree)
+        dest_node: PathNode = PathUtil.pos_to_node(PathUtil.from_numpy(path[dest, :]), tree)
+
+        source_vpos: Vector3 = PathUtil.node_to_vpos(source_node, tree)
+        dest_vpos: Vector3 = PathUtil.node_to_vpos(dest_node, tree)
+
+        # TODO: Fix and optimise this.
+        prev_node: Optional[PathNode] = None
+        for t in np.linspace(0.0, 1.0, 101):
+            pos: Vector3 = source_vpos * (1 - t) + dest_vpos * t
+            node: PathNode = PathUtil.pos_to_node(pos, tree)
+            if prev_node is None or node != prev_node:
+                prev_node = node
+                # noinspection PyCallByClass
+                if not PathUtil.node_is_free(node, tree):
+                    return False
+
+        return True
+
+    @staticmethod
     def pos_to_node(pos: Vector3, tree: OcTree) -> PathNode:
         voxel_size: float = tree.get_resolution()
         return \
@@ -162,7 +167,7 @@ class PathUtil:
             pulled_path.append(path[i, :])
 
             j: int = i + 2
-            while j < len(path) and PathUtil.is_traversible(path, i, j, tree):
+            while j < len(path) and PathUtil.path_is_traversible(path, i, j, tree):
                 j += 1
 
             i = j - 1
