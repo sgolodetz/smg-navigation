@@ -43,15 +43,8 @@ class AStarPathPlanner:
         goal_occupancy: str = PathUtil.occupancy_status(goal_node, self.__tree)
         print(source, source_node, source_occupancy)
         print(goal, goal_node, goal_occupancy)
-        if source_occupancy != "Free" or goal_occupancy != "Free":
+        if not (self.__is_traversible(source_node, use_clearance) and self.__is_traversible(goal_node, use_clearance)):
             return None
-        if use_clearance:
-            if self.__lacks_clearance(source_node):
-                print("Source has insufficient clearance")
-                return None
-            if self.__lacks_clearance(goal_node):
-                print("Goal has insufficient clearance")
-                return None
 
         g_scores: Dict[PathNode, float] = defaultdict(lambda: np.infty)
         g_scores[source_node] = 0.0
@@ -72,10 +65,7 @@ class AStarPathPlanner:
             current_vpos: Vector3 = PathUtil.node_to_vpos(current_node, self.__tree)
 
             for neighbour_node in self.__neighbours(current_node):
-                if PathUtil.occupancy_status(neighbour_node, self.__tree) != "Free":
-                    continue
-
-                if use_clearance and self.__lacks_clearance(neighbour_node):
+                if not self.__is_traversible(neighbour_node, use_clearance):
                     continue
 
                 neighbour_vpos: Vector3 = PathUtil.node_to_vpos(neighbour_node, self.__tree)
@@ -93,13 +83,16 @@ class AStarPathPlanner:
 
     # PRIVATE METHODS
 
-    def __is_traversible(self, node: PathNode) -> bool:
-        return PathUtil.occupancy_status(node, self.__tree) == "Free"
+    def __is_traversible(self, node: PathNode, use_clearance: bool) -> bool:
+        if PathUtil.occupancy_status(node, self.__tree) != "Free":
+            return False
 
-    def __lacks_clearance(self, node: PathNode) -> bool:
-        for neighbour_node in self.__neighbours(node):
-            if PathUtil.occupancy_status(neighbour_node, self.__tree) != "Free":
-                return True
+        if use_clearance:
+            for neighbour_node in self.__neighbours(node):
+                if PathUtil.occupancy_status(neighbour_node, self.__tree) != "Free":
+                    return False
+
+        return True
 
     def __reconstruct_path(self, goal_node: PathNode, came_from: Dict[PathNode, Optional[PathNode]]) \
             -> Deque[np.ndarray]:
