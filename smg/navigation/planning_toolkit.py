@@ -19,7 +19,7 @@ class PlanningToolkit:
     # CONSTRUCTOR
 
     def __init__(self, tree: OcTree, *, neighbours: Optional[Callable[[PathNode], List[PathNode]]] = None,
-                 node_is_free: Optional[Callable[[PathNode], bool]]):
+                 node_is_free: Optional[Callable[[PathNode], bool]] = None):
         self.__tree: OcTree = tree
 
         if neighbours is None:
