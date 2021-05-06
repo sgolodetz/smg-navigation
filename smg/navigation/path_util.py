@@ -18,6 +18,7 @@ class PathUtil:
 
     # PUBLIC STATIC HOOKS
 
+    neighbours: Callable[[PathNode], List[PathNode]] = lambda n: PathUtil.neighbours6(n)
     node_is_free: Callable[[PathNode, OcTree], bool] = lambda n, t: PathUtil.occupancy_status(n, t) == "Free"
 
     # PUBLIC STATIC METHODS
@@ -104,6 +105,23 @@ class PathUtil:
             (x + 1, y + 1, z + 1)
         ]
 
+    # noinspection PyCallByClass
+    @staticmethod
+    def node_is_traversible(node: PathNode, tree: OcTree, *, use_clearance: bool) -> bool:
+        if not PathUtil.node_is_free(node, tree):
+            return False
+
+        if use_clearance:
+            for neighbour_node in PathUtil.neighbours(node):
+                if not PathUtil.node_is_free(neighbour_node, tree):
+                    return False
+
+                # for nn_node in PathUtil.neighbours(neighbour_node):
+                #     if not PathUtil.node_is_free(nn_node, tree):
+                #         return False
+
+        return True
+
     @staticmethod
     def node_to_vpos(node: PathNode, tree: OcTree) -> Vector3:
         voxel_size: float = tree.get_resolution()
@@ -130,7 +148,7 @@ class PathUtil:
             return "Occupied" if occupied else "Free"
 
     @staticmethod
-    def path_is_traversible(path: np.ndarray, source: int, dest: int, tree: OcTree) -> bool:
+    def path_is_traversible(path: np.ndarray, source: int, dest: int, tree: OcTree, *, use_clearance: bool) -> bool:
         source_node: PathNode = PathUtil.pos_to_node(PathUtil.from_numpy(path[source, :]), tree)
         dest_node: PathNode = PathUtil.pos_to_node(PathUtil.from_numpy(path[dest, :]), tree)
 
@@ -145,7 +163,7 @@ class PathUtil:
             if prev_node is None or node != prev_node:
                 prev_node = node
                 # noinspection PyCallByClass
-                if not PathUtil.node_is_free(node, tree):
+                if not PathUtil.node_is_traversible(node, tree, use_clearance=use_clearance):
                     return False
 
         return True
@@ -159,7 +177,7 @@ class PathUtil:
             int(np.round(pos.z // voxel_size))
 
     @staticmethod
-    def pull_strings(path: np.ndarray, tree: OcTree) -> np.ndarray:
+    def pull_strings(path: np.ndarray, tree: OcTree, *, use_clearance: bool) -> np.ndarray:
         pulled_path: List[np.ndarray] = []
 
         i: int = 0
@@ -167,7 +185,7 @@ class PathUtil:
             pulled_path.append(path[i, :])
 
             j: int = i + 2
-            while j < len(path) and PathUtil.path_is_traversible(path, i, j, tree):
+            while j < len(path) and PathUtil.path_is_traversible(path, i, j, tree, use_clearance=use_clearance):
                 j += 1
 
             i = j - 1

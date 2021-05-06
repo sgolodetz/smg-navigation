@@ -14,8 +14,7 @@ class AStarPathPlanner:
 
     # CONSTRUCTOR
 
-    def __init__(self, tree: OcTree, neighbours: Callable[[PathNode], List[PathNode]]):
-        self.__neighbours: Callable[[PathNode], List[PathNode]] = neighbours
+    def __init__(self, tree: OcTree):
         self.__tree: OcTree = tree
 
     # PUBLIC METHODS
@@ -43,8 +42,8 @@ class AStarPathPlanner:
         goal_occupancy: str = PathUtil.occupancy_status(goal_node, self.__tree)
         print(source, source_node, source_occupancy)
         print(goal, goal_node, goal_occupancy)
-        if not (self.__node_is_traversible(source_node, use_clearance) and
-                self.__node_is_traversible(goal_node, use_clearance)):
+        if not (PathUtil.node_is_traversible(source_node, self.__tree, use_clearance=use_clearance) and
+                PathUtil.node_is_traversible(goal_node, self.__tree, use_clearance=use_clearance)):
             return None
 
         g_scores: Dict[PathNode, float] = defaultdict(lambda: np.infty)
@@ -73,8 +72,8 @@ class AStarPathPlanner:
 
             frontier.pop()
 
-            for neighbour_node in self.__neighbours(current_node):
-                if not self.__node_is_traversible(neighbour_node, use_clearance):
+            for neighbour_node in PathUtil.neighbours(current_node):
+                if not PathUtil.node_is_traversible(neighbour_node, self.__tree, use_clearance=use_clearance):
                     continue
 
                 neighbour_vpos: Vector3 = PathUtil.node_to_vpos(neighbour_node, self.__tree)
@@ -91,21 +90,6 @@ class AStarPathPlanner:
         return None
 
     # PRIVATE METHODS
-
-    def __node_is_traversible(self, node: PathNode, use_clearance: bool) -> bool:
-        if not PathUtil.node_is_free(node, self.__tree):
-            return False
-
-        if use_clearance:
-            for neighbour_node in self.__neighbours(node):
-                if not PathUtil.node_is_free(neighbour_node, self.__tree):
-                    return False
-
-                # for nn_node in self.__neighbours(neighbour_node):
-                #     if not PathUtil.node_is_free(nn_node, self.__tree):
-                #         return False
-
-        return True
 
     def __reconstruct_path(self, goal_node: PathNode, came_from: Dict[PathNode, Optional[PathNode]]) \
             -> Deque[np.ndarray]:
