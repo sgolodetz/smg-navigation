@@ -34,6 +34,10 @@ class PathUtil:
         return cs(np.linspace(0, len(path) - 1, smoothed_length))
 
     @staticmethod
+    def l1_distance(v1: np.ndarray, v2: np.ndarray) -> float:
+        return np.linalg.norm(v1 - v2, ord=1)
+
+    @staticmethod
     def l2_distance(v1: np.ndarray, v2: np.ndarray) -> float:
         return np.linalg.norm(v1 - v2)
 
@@ -115,10 +119,6 @@ class PathUtil:
             for neighbour_node in PathUtil.neighbours(node):
                 if not PathUtil.node_is_free(neighbour_node, tree):
                     return False
-
-                # for nn_node in PathUtil.neighbours(neighbour_node):
-                #     if not PathUtil.node_is_free(nn_node, tree):
-                #         return False
 
         return True
 

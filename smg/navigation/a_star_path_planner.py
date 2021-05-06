@@ -28,9 +28,9 @@ class AStarPathPlanner:
         # 2) https://www.redblobgames.com/pathfinding/a-star/implementation.html
 
         if d is None:
-            d = PathUtil.l2_distance
+            d = PathUtil.l1_distance
         if h is None:
-            h = PathUtil.l2_distance
+            h = PathUtil.l1_distance
 
         source_node: PathNode = PathUtil.pos_to_node(source, self.__tree)
         goal_node: PathNode = PathUtil.pos_to_node(goal, self.__tree)
