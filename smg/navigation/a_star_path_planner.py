@@ -38,8 +38,12 @@ class AStarPathPlanner:
         source_vpos: Vector3 = PathUtil.node_to_vpos(source_node, self.__tree)
         goal_vpos: Vector3 = PathUtil.node_to_vpos(goal_node, self.__tree)
 
-        print(source, source_node, PathUtil.occupancy_status(source_node, self.__tree))
-        print(goal, goal_node, PathUtil.occupancy_status(goal_node, self.__tree))
+        source_occupancy: str = PathUtil.occupancy_status(source_node, self.__tree)
+        goal_occupancy: str = PathUtil.occupancy_status(goal_node, self.__tree)
+        print(source, source_node, source_occupancy)
+        print(goal, goal_node, goal_occupancy)
+        if source_occupancy != "Free" or goal_occupancy != "Free":
+            return None
 
         g_scores: Dict[PathNode, float] = defaultdict(lambda: np.infty)
         g_scores[source_node] = 0.0

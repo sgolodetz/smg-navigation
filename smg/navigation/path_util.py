@@ -2,7 +2,7 @@ import numpy as np
 
 from smg.pyoctomap import OcTree, OcTreeNode, Vector3
 
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import PchipInterpolator
 from typing import List, Optional, Tuple
 
 
@@ -24,8 +24,8 @@ class PathUtil:
 
     @staticmethod
     def interpolate(path: np.ndarray, *, smoothed_length: int = 100) -> np.ndarray:
-        x: List[int] = np.arange(len(path))
-        cs: CubicSpline = CubicSpline(x, path, bc_type='clamped')
+        x: np.ndarray = np.arange(len(path))
+        cs: PchipInterpolator = PchipInterpolator(x, path)
         return cs(np.linspace(0, len(path) - 1, smoothed_length))
 
     @staticmethod
@@ -63,6 +63,18 @@ class PathUtil:
         ]
 
     @staticmethod
+    def neighbours6(node: PathNode) -> List[PathNode]:
+        x, y, z = node
+        return [
+            (x, y, z - 1),
+            (x, y - 1, z),
+            (x, y + 1, z),
+            (x - 1, y, z),
+            (x + 1, y, z),
+            (x, y, z + 1)
+        ]
+
+    @staticmethod
     def neighbours8(node: PathNode) -> List[PathNode]:
         x, y, z = node
         return [
@@ -74,6 +86,38 @@ class PathUtil:
             (x - 1, y, z + 1),
             (x, y, z + 1),
             (x + 1, y, z + 1)
+        ]
+
+    @staticmethod
+    def neighbours26(node: PathNode) -> List[PathNode]:
+        x, y, z = node
+        return [
+            (x - 1, y - 1, z - 1),
+            (x,     y - 1, z - 1),
+            (x + 1, y - 1, z - 1),
+            (x - 1, y,     z - 1),
+            (x,     y,     z - 1),
+            (x + 1, y,     z - 1),
+            (x - 1, y + 1, z - 1),
+            (x,     y + 1, z - 1),
+            (x + 1, y + 1, z - 1),
+            (x - 1, y - 1, z),
+            (x,     y - 1, z),
+            (x + 1, y - 1, z),
+            (x - 1, y,     z),
+            (x + 1, y,     z),
+            (x - 1, y + 1, z),
+            (x,     y + 1, z),
+            (x + 1, y + 1, z),
+            (x - 1, y - 1, z + 1),
+            (x,     y - 1, z + 1),
+            (x + 1, y - 1, z + 1),
+            (x - 1, y,     z + 1),
+            (x,     y,     z + 1),
+            (x + 1, y,     z + 1),
+            (x - 1, y + 1, z + 1),
+            (x,     y + 1, z + 1),
+            (x + 1, y + 1, z + 1)
         ]
 
     @staticmethod
