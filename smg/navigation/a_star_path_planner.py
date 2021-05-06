@@ -1,9 +1,9 @@
 import numpy as np
 
 from collections import defaultdict, deque
-from typing import Callable, Deque, Dict, List, Optional
+from typing import Callable, Deque, Dict, Optional
 
-from smg.pyoctomap import OcTree, Vector3
+from smg.pyoctomap import OcTree
 from smg.utility import PriorityQueue
 
 from .path_util import PathNode, PathUtil
@@ -19,8 +19,8 @@ class AStarPathPlanner:
 
     # PUBLIC METHODS
 
-    def plan_path(self, *, source, goal, d: Optional[Callable[[Vector3, Vector3], float]] = None,
-                  h: Optional[Callable[[Vector3, Vector3], float]] = None, use_clearance: bool = False) \
+    def plan_path(self, *, source, goal, d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                  h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None, use_clearance: bool = False) \
             -> Optional[np.ndarray]:
         # Based on an amalgam of:
         #
@@ -32,11 +32,11 @@ class AStarPathPlanner:
         if h is None:
             h = PathUtil.l2_distance
 
-        source_node: PathNode = PathUtil.pos_to_node(Vector3(*source), self.__tree)
-        goal_node: PathNode = PathUtil.pos_to_node(Vector3(*goal), self.__tree)
+        source_node: PathNode = PathUtil.pos_to_node(source, self.__tree)
+        goal_node: PathNode = PathUtil.pos_to_node(goal, self.__tree)
 
-        source_vpos: Vector3 = PathUtil.node_to_vpos(source_node, self.__tree)
-        goal_vpos: Vector3 = PathUtil.node_to_vpos(goal_node, self.__tree)
+        source_vpos: np.ndarray = PathUtil.node_to_vpos(source_node, self.__tree)
+        goal_vpos: np.ndarray = PathUtil.node_to_vpos(goal_node, self.__tree)
 
         source_occupancy: str = PathUtil.occupancy_status(source_node, self.__tree)
         goal_occupancy: str = PathUtil.occupancy_status(goal_node, self.__tree)
@@ -55,7 +55,7 @@ class AStarPathPlanner:
 
         while not frontier.empty():
             current_node: PathNode = frontier.top().ident
-            current_vpos: Vector3 = PathUtil.node_to_vpos(current_node, self.__tree)
+            current_vpos: np.ndarray = PathUtil.node_to_vpos(current_node, self.__tree)
 
             # if PathUtil.path_is_traversible(np.vstack([PathUtil.to_numpy(current_vpos), PathUtil.to_numpy(goal_vpos)]), 0, 1, self.__tree):
             #     path: Deque[np.ndarray] = self.__reconstruct_path(current_node, came_from)
@@ -76,7 +76,7 @@ class AStarPathPlanner:
                 if not PathUtil.node_is_traversible(neighbour_node, self.__tree, use_clearance=use_clearance):
                     continue
 
-                neighbour_vpos: Vector3 = PathUtil.node_to_vpos(neighbour_node, self.__tree)
+                neighbour_vpos: np.ndarray = PathUtil.node_to_vpos(neighbour_node, self.__tree)
                 tentative_cost: float = g_scores[current_node] + d(current_vpos, neighbour_vpos)
                 if tentative_cost < g_scores[neighbour_node]:
                     g_scores[neighbour_node] = tentative_cost
@@ -96,6 +96,6 @@ class AStarPathPlanner:
         path: Deque[np.ndarray] = deque()
         current_node: Optional[PathNode] = goal_node
         while current_node is not None:
-            path.appendleft(PathUtil.node_to_vpos_np(current_node, self.__tree))
+            path.appendleft(PathUtil.node_to_vpos(current_node, self.__tree))
             current_node = came_from.get(current_node)
         return path

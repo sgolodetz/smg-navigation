@@ -25,7 +25,7 @@ class PathUtil:
 
     @staticmethod
     def from_numpy(v: np.ndarray) -> Vector3:
-        return Vector3(v[0], v[1], v[2])
+        return Vector3(*v)
 
     @staticmethod
     def interpolate(path: np.ndarray, *, smoothed_length: int = 100) -> np.ndarray:
@@ -34,8 +34,8 @@ class PathUtil:
         return cs(np.linspace(0, len(path) - 1, smoothed_length))
 
     @staticmethod
-    def l2_distance(v1: Vector3, v2: Vector3) -> float:
-        return np.linalg.norm(PathUtil.to_numpy(v1) - PathUtil.to_numpy(v2))
+    def l2_distance(v1: np.ndarray, v2: np.ndarray) -> float:
+        return np.linalg.norm(v1 - v2)
 
     @staticmethod
     def neighbours4(node: PathNode) -> List[PathNode]:
@@ -123,24 +123,16 @@ class PathUtil:
         return True
 
     @staticmethod
-    def node_to_vpos(node: PathNode, tree: OcTree) -> Vector3:
+    def node_to_vpos(node: PathNode, tree: OcTree) -> np.ndarray:
         voxel_size: float = tree.get_resolution()
         half_voxel_size: float = voxel_size / 2.0
-        return Vector3(
-            node[0] * voxel_size + half_voxel_size,
-            node[1] * voxel_size + half_voxel_size,
-            node[2] * voxel_size + half_voxel_size
-        )
-
-    @staticmethod
-    def node_to_vpos_np(node: PathNode, tree: OcTree) -> np.ndarray:
-        return PathUtil.to_numpy(PathUtil.node_to_vpos(node, tree))
+        return np.array([node[i] * voxel_size + half_voxel_size for i in range(3)])
 
     @staticmethod
     def occupancy_status(node: PathNode, tree: OcTree) -> str:
         # FIXME: Use an enumeration for the return values.
-        vpos: Vector3 = PathUtil.node_to_vpos(node, tree)
-        octree_node: Optional[OcTreeNode] = tree.search(vpos)
+        vpos: np.ndarray = PathUtil.node_to_vpos(node, tree)
+        octree_node: Optional[OcTreeNode] = tree.search(PathUtil.from_numpy(vpos))
         if octree_node is None:
             return "Unknown"
         else:
@@ -149,16 +141,16 @@ class PathUtil:
 
     @staticmethod
     def path_is_traversible(path: np.ndarray, source: int, dest: int, tree: OcTree, *, use_clearance: bool) -> bool:
-        source_node: PathNode = PathUtil.pos_to_node(PathUtil.from_numpy(path[source, :]), tree)
-        dest_node: PathNode = PathUtil.pos_to_node(PathUtil.from_numpy(path[dest, :]), tree)
+        source_node: PathNode = PathUtil.pos_to_node(path[source, :], tree)
+        dest_node: PathNode = PathUtil.pos_to_node(path[dest, :], tree)
 
-        source_vpos: Vector3 = PathUtil.node_to_vpos(source_node, tree)
-        dest_vpos: Vector3 = PathUtil.node_to_vpos(dest_node, tree)
+        source_vpos: np.ndarray = PathUtil.node_to_vpos(source_node, tree)
+        dest_vpos: np.ndarray = PathUtil.node_to_vpos(dest_node, tree)
 
         # TODO: Fix and optimise this.
         prev_node: Optional[PathNode] = None
         for t in np.linspace(0.0, 1.0, 101):
-            pos: Vector3 = source_vpos * (1 - t) + dest_vpos * t
+            pos: np.ndarray = source_vpos * (1 - t) + dest_vpos * t
             node: PathNode = PathUtil.pos_to_node(pos, tree)
             if prev_node is None or node != prev_node:
                 prev_node = node
@@ -169,12 +161,9 @@ class PathUtil:
         return True
 
     @staticmethod
-    def pos_to_node(pos: Vector3, tree: OcTree) -> PathNode:
+    def pos_to_node(pos: np.ndarray, tree: OcTree) -> PathNode:
         voxel_size: float = tree.get_resolution()
-        return \
-            int(np.round(pos.x // voxel_size)), \
-            int(np.round(pos.y // voxel_size)), \
-            int(np.round(pos.z // voxel_size))
+        return tuple(np.round(pos // voxel_size).astype(int))
 
     @staticmethod
     def pull_strings(path: np.ndarray, tree: OcTree, *, use_clearance: bool) -> np.ndarray:
@@ -191,7 +180,3 @@ class PathUtil:
             i = j - 1
 
         return np.vstack(pulled_path)
-
-    @staticmethod
-    def to_numpy(v: Vector3) -> np.ndarray:
-        return np.array([v.x, v.y, v.z])
