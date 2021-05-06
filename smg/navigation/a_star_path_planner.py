@@ -21,7 +21,8 @@ class AStarPathPlanner:
     # PUBLIC METHODS
 
     def plan_path(self, *, source, goal, d: Optional[Callable[[Vector3, Vector3], float]] = None,
-                  h: Optional[Callable[[Vector3, Vector3], float]] = None) -> Optional[np.ndarray]:
+                  h: Optional[Callable[[Vector3, Vector3], float]] = None, use_clearance: bool = False) \
+            -> Optional[np.ndarray]:
         # Based on an amalgam of:
         #
         # 1) https://en.wikipedia.org/wiki/A*_search_algorithm
@@ -44,6 +45,13 @@ class AStarPathPlanner:
         print(goal, goal_node, goal_occupancy)
         if source_occupancy != "Free" or goal_occupancy != "Free":
             return None
+        if use_clearance:
+            if self.__lacks_clearance(source_node):
+                print("Source has insufficient clearance")
+                return None
+            if self.__lacks_clearance(goal_node):
+                print("Goal has insufficient clearance")
+                return None
 
         g_scores: Dict[PathNode, float] = defaultdict(lambda: np.infty)
         g_scores[source_node] = 0.0
@@ -67,6 +75,9 @@ class AStarPathPlanner:
                 if PathUtil.occupancy_status(neighbour_node, self.__tree) != "Free":
                     continue
 
+                if use_clearance and self.__lacks_clearance(neighbour_node):
+                    continue
+
                 neighbour_vpos: Vector3 = PathUtil.node_to_vpos(neighbour_node, self.__tree)
                 tentative_cost: float = g_scores[current_node] + d(current_vpos, neighbour_vpos)
                 if tentative_cost < g_scores[neighbour_node]:
@@ -81,6 +92,14 @@ class AStarPathPlanner:
         return None
 
     # PRIVATE METHODS
+
+    def __is_traversible(self, node: PathNode) -> bool:
+        return PathUtil.occupancy_status(node, self.__tree) == "Free"
+
+    def __lacks_clearance(self, node: PathNode) -> bool:
+        for neighbour_node in self.__neighbours(node):
+            if PathUtil.occupancy_status(neighbour_node, self.__tree) != "Free":
+                return True
 
     def __reconstruct_path(self, goal_node: PathNode, came_from: Dict[PathNode, Optional[PathNode]]) \
             -> Deque[np.ndarray]:
