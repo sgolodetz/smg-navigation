@@ -18,7 +18,7 @@ class AStarPathPlanner:
 
     # PUBLIC METHODS
 
-    def plan_path(self, *, source, goal, d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+    def plan_path(self, source, goal, *, d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                   h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None, use_clearance: bool = False) \
             -> Optional[np.ndarray]:
         # Based on an amalgam of:

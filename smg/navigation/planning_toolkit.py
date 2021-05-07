@@ -43,6 +43,16 @@ class PlanningToolkit:
         return np.linalg.norm(v1 - v2, ord=1)
 
     @staticmethod
+    def l1_penalise_vertical(mu: float) -> Callable[[np.ndarray, np.ndarray], float]:
+        def inner(v1: np.ndarray, v2: np.ndarray) -> float:
+            dx: float = abs(v2[0] - v1[0])
+            dy: float = abs(v2[1] - v1[1])
+            dz: float = abs(v2[2] - v1[2])
+            return dx + mu * dy + dz
+
+        return inner
+
+    @staticmethod
     def l2_distance(v1: np.ndarray, v2: np.ndarray) -> float:
         return np.linalg.norm(v1 - v2)
 
