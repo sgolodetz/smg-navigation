@@ -14,12 +14,22 @@ PathNode = Tuple[int, int, int]
 # MAIN CLASS
 
 class PlanningToolkit:
-    """TODO"""
+    """A toolkit of useful functions for use by path planners that work with Octomap scenes."""
 
     # CONSTRUCTOR
 
     def __init__(self, tree: OcTree, *, neighbours: Optional[Callable[[PathNode], List[PathNode]]] = None,
                  node_is_free: Optional[Callable[[PathNode], bool]] = None):
+        """
+        Construct a planning toolkit.
+
+        .. note::
+            If the neighbours function isn't explicitly specified, 6-connected neighbours will be computed.
+
+        :param tree:            The Octomap octree over which paths are to be planned.
+        :param neighbours:      An optional function specifying how the neighbours of a path node are to be computed.
+        :param node_is_free:    An optional function specifying what counts as a "free" path node.
+        """
         self.__tree: OcTree = tree
 
         if neighbours is None:
@@ -40,6 +50,13 @@ class PlanningToolkit:
 
     @staticmethod
     def l1_distance(v1: np.ndarray, v2: np.ndarray) -> float:
+        """
+        Compute the L1 distance between the two specified vectors.
+
+        :param v1:  The first vector.
+        :param v2:  The second vector.
+        :return:    The L1 distance between the two vectors.
+        """
         return np.linalg.norm(v1 - v2, ord=1)
 
     @staticmethod
