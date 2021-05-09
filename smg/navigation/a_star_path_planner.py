@@ -1,7 +1,7 @@
 import numpy as np
 
 from collections import defaultdict, deque
-from typing import Callable, Deque, Dict, Optional
+from typing import Callable, Deque, Dict, List, Optional
 
 from smg.utility import PriorityQueue
 
@@ -18,9 +18,31 @@ class AStarPathPlanner:
 
     # PUBLIC METHODS
 
-    def plan_path(self, source, goal, *, d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                  h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None, use_clearance: bool = False) \
-            -> Optional[np.ndarray]:
+    def plan_multipath(self, waypoints: List[np.ndarray],
+                       d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                       h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                       pull_strings: bool = True, use_clearance: bool = False) -> Optional[np.ndarray]:
+        multipath: List[np.ndarray] = []
+
+        for i in range(len(waypoints) - 1):
+            j: int = i + 1
+            path: Optional[np.ndarray] = self.plan_path(
+                waypoints[i], waypoints[j], d=d, h=h, pull_strings=pull_strings, use_clearance=use_clearance
+            )
+            if path is None:
+                return None
+            else:
+                if j == len(waypoints) - 1:
+                    multipath.append(path)
+                else:
+                    multipath.append(path[:-1])
+
+        return np.vstack(multipath)
+
+    def plan_path(self, source: np.ndarray, goal: np.ndarray, *,
+                  d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                  h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                  pull_strings: bool = True, use_clearance: bool = False) -> Optional[np.ndarray]:
         # Based on an amalgam of:
         #
         # 1) https://en.wikipedia.org/wiki/A*_search_algorithm
@@ -69,7 +91,10 @@ class AStarPathPlanner:
                 path: Deque[np.ndarray] = self.__reconstruct_path(goal_node, came_from)
                 path.appendleft(source)
                 path.append(goal)
-                return np.vstack(path)
+                if pull_strings:
+                    return self.__toolkit.pull_strings(np.vstack(path), use_clearance=use_clearance)
+                else:
+                    return np.vstack(path)
 
             frontier.pop()
 

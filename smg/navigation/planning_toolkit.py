@@ -2,7 +2,7 @@ import numpy as np
 
 from smg.pyoctomap import OcTree, OcTreeNode, Vector3
 
-from scipy.interpolate import PchipInterpolator
+from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 from typing import Callable, List, Optional, Tuple
 
 
@@ -45,7 +45,8 @@ class PlanningToolkit:
     @staticmethod
     def interpolate_path(path: np.ndarray, *, new_length: int = 100) -> np.ndarray:
         x: np.ndarray = np.arange(len(path))
-        cs: PchipInterpolator = PchipInterpolator(x, path)
+        # cs: PchipInterpolator = PchipInterpolator(x, path)
+        cs: Akima1DInterpolator = Akima1DInterpolator(x, path)
         return cs(np.linspace(0, len(path) - 1, new_length))
 
     @staticmethod
