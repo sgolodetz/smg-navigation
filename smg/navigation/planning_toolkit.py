@@ -8,6 +8,35 @@ from typing import Callable, List, Optional, Tuple
 
 # HELPER TYPES
 
+class EOccupancyStatus(int):
+    """The occupancy status of an Octomap voxel."""
+
+    # SPECIAL METHODS
+
+    def __str__(self) -> str:
+        """
+        Get a string representation of the occupancy status of an Octomap voxel.
+
+        :return:    A string representation of the occupancy status of an Octomap voxel.
+        """
+        if self == OCS_FREE:
+            return "OCS_FREE"
+        elif self == OCS_OCCUPIED:
+            return "OCS_OCCUPIED"
+        else:
+            return "OCS_UNKNOWN"
+
+
+# The voxel is known to be unoccupied.
+OCS_FREE = EOccupancyStatus(0)
+
+# The voxel is known to be occupied.
+OCS_OCCUPIED = EOccupancyStatus(1)
+
+# The occupancy status of the voxel is unknown.
+OCS_UNKNOWN = EOccupancyStatus(2)
+
+
 PathNode = Tuple[int, int, int]
 
 
@@ -35,7 +64,7 @@ class PlanningToolkit:
         if neighbours is None:
             neighbours = PlanningToolkit.neighbours6
         if node_is_free is None:
-            node_is_free = lambda n: self.occupancy_status(n) == "Free"
+            node_is_free = lambda n: self.occupancy_status(n) == OCS_FREE
 
         self.neighbours: Callable[[PathNode], List[PathNode]] = neighbours
         self.node_is_free: Callable[[PathNode], bool] = node_is_free
@@ -257,21 +286,20 @@ class PlanningToolkit:
         half_voxel_size: float = voxel_size / 2.0
         return np.array([node[i] * voxel_size + half_voxel_size for i in range(3)])
 
-    def occupancy_status(self, node: PathNode) -> str:
+    def occupancy_status(self, node: PathNode) -> EOccupancyStatus:
         """
         Get the occupancy status of the Octomap voxel corresponding to the specified path node.
 
         :param node:    A path node.
         :return:        The occupancy status of the Octomap voxel corresponding to the path node.
         """
-        # FIXME: Use an enumeration for the return values.
         vpos: np.ndarray = self.node_to_vpos(node)
         octree_node: Optional[OcTreeNode] = self.__tree.search(Vector3(*vpos))
         if octree_node is None:
-            return "Unknown"
+            return OCS_UNKNOWN
         else:
             occupied: bool = self.__tree.is_node_occupied(octree_node)
-            return "Occupied" if occupied else "Free"
+            return OCS_OCCUPIED if occupied else OCS_FREE
 
     def pos_to_node(self, pos: np.ndarray) -> PathNode:
         """

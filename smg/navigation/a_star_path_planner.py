@@ -5,7 +5,7 @@ from typing import Callable, Deque, Dict, List, Optional
 
 from smg.utility import PriorityQueue
 
-from .planning_toolkit import PathNode, PlanningToolkit
+from .planning_toolkit import EOccupancyStatus, PathNode, PlanningToolkit
 
 
 class AStarPathPlanner:
@@ -59,8 +59,8 @@ class AStarPathPlanner:
         source_vpos: np.ndarray = self.__toolkit.node_to_vpos(source_node)
         goal_vpos: np.ndarray = self.__toolkit.node_to_vpos(goal_node)
 
-        source_occupancy: str = self.__toolkit.occupancy_status(source_node)
-        goal_occupancy: str = self.__toolkit.occupancy_status(goal_node)
+        source_occupancy: EOccupancyStatus = self.__toolkit.occupancy_status(source_node)
+        goal_occupancy: EOccupancyStatus = self.__toolkit.occupancy_status(goal_node)
         print(source, source_node, source_occupancy)
         print(goal, goal_node, goal_occupancy)
         if not (self.__toolkit.node_is_traversible(source_node, use_clearance=use_clearance) and
