@@ -49,9 +49,9 @@ class AStarPathPlanner:
         # 2) https://www.redblobgames.com/pathfinding/a-star/implementation.html
 
         if d is None:
-            d = PlanningToolkit.l1_distance
+            d = PlanningToolkit.l1_distance()
         if h is None:
-            h = PlanningToolkit.l1_distance
+            h = PlanningToolkit.l1_distance()
 
         source_node: PathNode = self.__toolkit.pos_to_node(source)
         goal_node: PathNode = self.__toolkit.pos_to_node(goal)

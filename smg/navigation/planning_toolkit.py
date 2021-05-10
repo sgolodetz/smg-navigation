@@ -2,7 +2,7 @@ import numpy as np
 
 from smg.pyoctomap import OcTree, OcTreeNode, Vector3
 
-from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
+from scipy.interpolate import Akima1DInterpolator
 from typing import Callable, List, Optional, Tuple
 
 
@@ -45,37 +45,59 @@ class PlanningToolkit:
     @staticmethod
     def interpolate_path(path: np.ndarray, *, new_length: int = 100) -> np.ndarray:
         x: np.ndarray = np.arange(len(path))
-        # cs: PchipInterpolator = PchipInterpolator(x, path)
         cs: Akima1DInterpolator = Akima1DInterpolator(x, path)
         return cs(np.linspace(0, len(path) - 1, new_length))
 
     @staticmethod
-    def l1_distance(v1: np.ndarray, v2: np.ndarray) -> float:
+    def l1_distance(*, ax: float = 1.0, ay: float = 1.0, az: float = 1.0) -> Callable[[np.ndarray, np.ndarray], float]:
         """
-        Compute the L1 distance between the two specified vectors.
+        Construct a function that computes a scaled L1 distance between two vectors.
 
-        :param v1:  The first vector.
-        :param v2:  The second vector.
-        :return:    The L1 distance between the two vectors.
+        .. note::
+            Specifically, the constructed function will compute ax * |x2-x1| + ay * |y2-y1| + az * |z2-z1|.
+
+        :param ax:  The x scaling factor.
+        :param ay:  The y scaling factor.
+        :param az:  The z scaling factor.
+        :return:    A function that will compute a scaled L1 distance between two vectors.
         """
-        return np.linalg.norm(v1 - v2, ord=1)
-
-    @staticmethod
-    def l1_penalise_vertical(mu: float) -> Callable[[np.ndarray, np.ndarray], float]:
         def inner(v1: np.ndarray, v2: np.ndarray) -> float:
+            """
+            Compute a scaled L1 distance between two vectors.
+
+            .. note::
+                The scaling factors are baked into the function when it is constructed.
+
+            :param v1:  The first vector.
+            :param v2:  The second vector.
+            :return:    The scaled L1 distance between the vectors.
+            """
             dx: float = abs(v2[0] - v1[0])
             dy: float = abs(v2[1] - v1[1])
             dz: float = abs(v2[2] - v1[2])
-            return dx + mu * dy + dz
+            return ax * dx + ay * dy + az * dz
 
         return inner
 
     @staticmethod
     def l2_distance(v1: np.ndarray, v2: np.ndarray) -> float:
+        """
+        Compute the L2 distance between two vectors.
+
+        :param v1:  The first vector.
+        :param v2:  The second vector.
+        :return:    The L2 distance between the vectors.
+        """
         return np.linalg.norm(v1 - v2)
 
     @staticmethod
     def neighbours4(node: PathNode) -> List[PathNode]:
+        """
+        Get the 4-connected neighbours of a path node.
+
+        :param node:    The node.
+        :return:        The 4-connected neighbours of the node.
+        """
         x, y, z = node
         return [
             (x, y, z - 1),
@@ -86,6 +108,12 @@ class PlanningToolkit:
 
     @staticmethod
     def neighbours6(node: PathNode) -> List[PathNode]:
+        """
+        Get the 6-connected neighbours of a path node.
+
+        :param node:    The node.
+        :return:        The 6-connected neighbours of the node.
+        """
         x, y, z = node
         return [
             (x, y, z - 1),
@@ -98,6 +126,12 @@ class PlanningToolkit:
 
     @staticmethod
     def neighbours8(node: PathNode) -> List[PathNode]:
+        """
+        Get the 8-connected neighbours of a path node.
+
+        :param node:    The node.
+        :return:        The 8-connected neighbours of the node.
+        """
         x, y, z = node
         return [
             (x - 1, y, z - 1),
@@ -112,6 +146,12 @@ class PlanningToolkit:
 
     @staticmethod
     def neighbours26(node: PathNode) -> List[PathNode]:
+        """
+        Get the 26-connected neighbours of a path node.
+
+        :param node:    The node.
+        :return:        The 26-connected neighbours of the node.
+        """
         x, y, z = node
         return [
             (x - 1, y - 1, z - 1),
@@ -144,33 +184,7 @@ class PlanningToolkit:
 
     # PUBLIC METHODS
 
-    def node_is_traversible(self, node: PathNode, *, use_clearance: bool) -> bool:
-        if not self.node_is_free(node):
-            return False
-
-        if use_clearance:
-            for neighbour_node in self.neighbours(node):
-                if not self.node_is_free(neighbour_node):
-                    return False
-
-        return True
-
-    def node_to_vpos(self, node: PathNode) -> np.ndarray:
-        voxel_size: float = self.__tree.get_resolution()
-        half_voxel_size: float = voxel_size / 2.0
-        return np.array([node[i] * voxel_size + half_voxel_size for i in range(3)])
-
-    def occupancy_status(self, node: PathNode) -> str:
-        # FIXME: Use an enumeration for the return values.
-        vpos: np.ndarray = self.node_to_vpos(node)
-        octree_node: Optional[OcTreeNode] = self.__tree.search(Vector3(*vpos))
-        if octree_node is None:
-            return "Unknown"
-        else:
-            occupied: bool = self.__tree.is_node_occupied(octree_node)
-            return "Occupied" if occupied else "Free"
-
-    def path_is_traversible(self, path: np.ndarray, source: int, dest: int, *, use_clearance: bool) -> bool:
+    def chord_is_traversible(self, path: np.ndarray, source: int, dest: int, *, use_clearance: bool) -> bool:
         source_node: PathNode = self.pos_to_node(path[source, :])
         dest_node: PathNode = self.pos_to_node(path[dest, :])
 
@@ -189,7 +203,58 @@ class PlanningToolkit:
 
         return True
 
+    def node_is_traversible(self, node: PathNode, *, use_clearance: bool) -> bool:
+        """
+        Check whether the specified path node can be traversed.
+
+        .. note::
+            The definition of a node's traversibility depends on whether we're requiring there to be sufficient
+            "clearance" around the node or not. If not, a node is traversible if it's "free", which is defined
+            in terms of its occupancy status. If so, a node is traversible if not only is it "free", but so are
+            its immediate neighbours.
+
+        :param node:            The node whose traversibility we want to check.
+        :param use_clearance:   Whether to require there to be sufficient "clearance" around the node.
+        :return:                True, if the node is traversible, or False otherwise.
+        """
+        if not self.node_is_free(node):
+            return False
+
+        if use_clearance:
+            for neighbour_node in self.neighbours(node):
+                if not self.node_is_free(neighbour_node):
+                    return False
+
+        return True
+
+    def node_to_vpos(self, node: PathNode) -> np.ndarray:
+        """
+        Compute the position of the centre of the voxel corresponding to the specified path node.
+
+        :param node:    The path node.
+        :return:        The position of the centre of the corresponding voxel.
+        """
+        voxel_size: float = self.__tree.get_resolution()
+        half_voxel_size: float = voxel_size / 2.0
+        return np.array([node[i] * voxel_size + half_voxel_size for i in range(3)])
+
+    def occupancy_status(self, node: PathNode) -> str:
+        # FIXME: Use an enumeration for the return values.
+        vpos: np.ndarray = self.node_to_vpos(node)
+        octree_node: Optional[OcTreeNode] = self.__tree.search(Vector3(*vpos))
+        if octree_node is None:
+            return "Unknown"
+        else:
+            occupied: bool = self.__tree.is_node_occupied(octree_node)
+            return "Occupied" if occupied else "Free"
+
     def pos_to_node(self, pos: np.ndarray) -> PathNode:
+        """
+        Compute the path node corresponding to the voxel that contains the specified position.
+
+        :param pos: The position.
+        :return:    The path node corresponding to the voxel that contains the position.
+        """
         voxel_size: float = self.__tree.get_resolution()
         return tuple(np.round(pos // voxel_size).astype(int))
 
@@ -201,7 +266,7 @@ class PlanningToolkit:
             pulled_path.append(path[i, :])
 
             j: int = i + 2
-            while j < len(path) and self.path_is_traversible(path, i, j, use_clearance=use_clearance):
+            while j < len(path) and self.chord_is_traversible(path, i, j, use_clearance=use_clearance):
                 j += 1
 
             i = j - 1
