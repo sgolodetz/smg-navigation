@@ -28,7 +28,7 @@ class AStarPathPlanner:
     def plan_multipath(self, waypoints: List[np.ndarray],
                        d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                        h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                       allow_shortcuts: bool = False, pull_strings: bool = True, use_clearance: bool = False) \
+                       allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True) \
             -> Optional[np.ndarray]:
         """
         Try to plan a path that visits the specified set of waypoints.
@@ -74,7 +74,7 @@ class AStarPathPlanner:
     def plan_path(self, source: np.ndarray, goal: np.ndarray, *,
                   d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                   h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                  allow_shortcuts: bool = False, pull_strings: bool = True, use_clearance: bool = False) \
+                  allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True) \
             -> Optional[np.ndarray]:
         """
         Try to plan a path from the specified source to the specified goal.
