@@ -28,7 +28,8 @@ class AStarPathPlanner:
     def plan_multipath(self, waypoints: List[np.ndarray],
                        d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                        h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                       pull_strings: bool = True, use_clearance: bool = False) -> Optional[np.ndarray]:
+                       allow_shortcuts: bool = False, pull_strings: bool = True, use_clearance: bool = False) \
+            -> Optional[np.ndarray]:
         """
         Try to plan a path that visits the specified set of waypoints.
 
@@ -38,6 +39,7 @@ class AStarPathPlanner:
         :param waypoints:       The waypoints to visit.
         :param d:               An optional distance function (if None, L1 distance will be used).
         :param h:               An optional heuristic function (if None, L1 distance will be used).
+        :param allow_shortcuts: Whether or not to allow shortcutting when the goal is in sight.
         :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:   Whether or not to plan a path that has sufficient "clearance" around it.
         :return:                The path, if one was successfully found, or None otherwise.
@@ -50,7 +52,10 @@ class AStarPathPlanner:
 
             # Try to plan an individual path between them.
             path: Optional[np.ndarray] = self.plan_path(
-                waypoints[i], waypoints[j], d=d, h=h, pull_strings=pull_strings, use_clearance=use_clearance
+                waypoints[i], waypoints[j], d=d, h=h,
+                allow_shortcuts=allow_shortcuts,
+                pull_strings=pull_strings,
+                use_clearance=use_clearance
             )
 
             # If no path can be found between this pair of waypoints, early out. Otherwise, add this path to the
@@ -69,7 +74,8 @@ class AStarPathPlanner:
     def plan_path(self, source: np.ndarray, goal: np.ndarray, *,
                   d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                   h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                  pull_strings: bool = True, use_clearance: bool = False) -> Optional[np.ndarray]:
+                  allow_shortcuts: bool = False, pull_strings: bool = True, use_clearance: bool = False) \
+            -> Optional[np.ndarray]:
         """
         Try to plan a path from the specified source to the specified goal.
 
@@ -80,6 +86,7 @@ class AStarPathPlanner:
         :param goal:            The goal (a 3D point in space).
         :param d:               An optional distance function (if None, L1 distance will be used).
         :param h:               An optional heuristic function (if None, L1 distance will be used).
+        :param allow_shortcuts: Whether or not to allow shortcutting when the goal is in sight.
         :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:   Whether or not to plan a path that has sufficient "clearance" around it.
         :return:                The path, if one was successfully found, or None otherwise.
@@ -136,30 +143,20 @@ class AStarPathPlanner:
             current_node: PathNode = frontier.top().ident
             current_vpos: np.ndarray = self.__toolkit.node_to_vpos(current_node)
 
-            # If the goal's in sight, cut the path planning short and head directly for it.
-            # if self.__toolkit.chord_is_traversible(
-            #     np.vstack([current_vpos, goal_vpos]), 0, 1, use_clearance=use_clearance
-            # ):
-            #     path: Deque[np.ndarray] = self.__reconstruct_path(current_node, came_from)
-            #     path.appendleft(source)
-            #     path.append(goal_vpos)
-            #     path.append(goal)
-            #     return np.vstack(path)
-
             # If we've reached the goal:
             if current_node == goal_node:
-                # Reconstruct the voxel path.
+                # Construct and return the path.
                 path: Deque[np.ndarray] = self.__reconstruct_path(goal_node, came_from)
+                return self.__finalise_path(path, source, goal, pull_strings=pull_strings, use_clearance=use_clearance)
 
-                # Respectively prepend and append the true source and goal to the reconstructed path.
-                path.appendleft(source)
-                path.append(goal)
-
-                # Return the path, performing string pulling in the process if requested.
-                if pull_strings:
-                    return self.__toolkit.pull_strings(np.vstack(path), use_clearance=use_clearance)
-                else:
-                    return np.vstack(path)
+            # Otherwise, if we're allowing shortcuts and the goal's in sight:
+            elif allow_shortcuts and self.__toolkit.chord_is_traversible(
+                    np.vstack([current_vpos, goal_vpos]), 0, 1, use_clearance=use_clearance
+            ):
+                # Cut the path planning short, and construct and return a path that heads directly for it.
+                path: Deque[np.ndarray] = self.__reconstruct_path(current_node, came_from)
+                path.append(goal_vpos)
+                return self.__finalise_path(path, source, goal, pull_strings=pull_strings, use_clearance=use_clearance)
 
             # Remove the current node from the frontier before proceeding.
             frontier.pop()
@@ -188,6 +185,28 @@ class AStarPathPlanner:
         return None
 
     # PRIVATE METHODS
+
+    def __finalise_path(self, path: Deque[np.ndarray], source: np.ndarray, goal: np.ndarray, *,
+                        pull_strings: bool, use_clearance: bool) -> np.ndarray:
+        """
+        Finalise a reconstructed path by adding the source and goal to it, and optionally performing string pulling.
+
+        :param path:            The path to finalise.
+        :param source:          The source (a 3D point in space).
+        :param goal:            The goal (a 3D point in space).
+        :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
+        :param use_clearance:   Whether or not to require sufficient "clearance" during string pulling.
+        :return:                The finalised path.
+        """
+        # Respectively prepend and append the true source and goal to the path.
+        path.appendleft(source)
+        path.append(goal)
+
+        # Return the path, performing string pulling in the process if requested.
+        if pull_strings:
+            return self.__toolkit.pull_strings(np.vstack(path), use_clearance=use_clearance)
+        else:
+            return np.vstack(path)
 
     def __reconstruct_path(self, goal_node: PathNode, came_from: Dict[PathNode, Optional[PathNode]]) \
             -> Deque[np.ndarray]:
