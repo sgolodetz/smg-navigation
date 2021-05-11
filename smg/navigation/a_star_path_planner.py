@@ -34,7 +34,7 @@ class AStarPathPlanner:
         Try to plan a path that visits the specified set of waypoints.
 
         .. note::
-            See PlanningToolkit.node_is_traversible for the definition of what "clearance" means in this case.
+            See PlanningToolkit.node_is_traversable for the definition of what "clearance" means in this case.
 
         :param waypoints:       The waypoints to visit.
         :param d:               An optional distance function (if None, L1 distance will be used).
@@ -80,7 +80,7 @@ class AStarPathPlanner:
         Try to plan a path from the specified source to the specified goal.
 
         .. note::
-            See PlanningToolkit.node_is_traversible for the definition of what "clearance" means in this case.
+            See PlanningToolkit.node_is_traversable for the definition of what "clearance" means in this case.
 
         :param source:          The source (a 3D point in space).
         :param goal:            The goal (a 3D point in space).
@@ -117,16 +117,16 @@ class AStarPathPlanner:
             print(f"Source: {source}, {source_node}, {source_occupancy}")
             print(f"Goal: {goal}, {goal_node}, {goal_occupancy}")
 
-        # Check that the source and goal are traversible to avoid costly searching for a path that can't exist.
-        # Early out if either is not traversible.
-        if not self.__toolkit.node_is_traversible(source_node, use_clearance=use_clearance):
+        # Check that the source and goal are traversable to avoid costly searching for a path that can't exist.
+        # Early out if either is not traversable.
+        if not self.__toolkit.node_is_traversable(source_node, use_clearance=use_clearance):
             if self.__debug:
-                print("Source is not traversible")
+                print("Source is not traversable")
             return None
 
-        if not self.__toolkit.node_is_traversible(goal_node, use_clearance=use_clearance):
+        if not self.__toolkit.node_is_traversable(goal_node, use_clearance=use_clearance):
             if self.__debug:
-                print("Goal is not traversible")
+                print("Goal is not traversable")
             return None
 
         # Search for a path using A*.
@@ -150,7 +150,7 @@ class AStarPathPlanner:
                 return self.__finalise_path(path, source, goal, pull_strings=pull_strings, use_clearance=use_clearance)
 
             # Otherwise, if we're allowing shortcuts and the goal's in sight:
-            elif allow_shortcuts and self.__toolkit.chord_is_traversible(
+            elif allow_shortcuts and self.__toolkit.chord_is_traversable(
                     np.vstack([current_vpos, goal_vpos]), 0, 1, use_clearance=use_clearance
             ):
                 # Cut the path planning short, and construct and return a path that heads directly for it.
@@ -161,9 +161,9 @@ class AStarPathPlanner:
             # Remove the current node from the frontier before proceeding.
             frontier.pop()
 
-            # For each traversible neighbour of the current node:
+            # For each traversable neighbour of the current node:
             for neighbour_node in self.__toolkit.neighbours(current_node):
-                if not self.__toolkit.node_is_traversible(neighbour_node, use_clearance=use_clearance):
+                if not self.__toolkit.node_is_traversable(neighbour_node, use_clearance=use_clearance):
                     continue
 
                 # Compute the tentative cost to the neighbour via the current node.

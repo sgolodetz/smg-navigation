@@ -223,7 +223,7 @@ class PlanningToolkit:
 
     # PUBLIC METHODS
 
-    def chord_is_traversible(self, path: np.ndarray, source: int, dest: int, *, use_clearance: bool) -> bool:
+    def chord_is_traversable(self, path: np.ndarray, source: int, dest: int, *, use_clearance: bool) -> bool:
         """
         Check whether the specified (straight line) chord between two points on a path can be directly traversed.
 
@@ -231,7 +231,7 @@ class PlanningToolkit:
         :param source:          The index of the source point on the path.
         :param dest:            The index of the destination point on the path.
         :param use_clearance:   Whether to require there to be sufficient "clearance" around the chord.
-        :return:                True, if the chord is traversible, or False otherwise.
+        :return:                True, if the chord is traversable, or False otherwise.
         """
         # Look up the voxels containing the source and destination points.
         source_node: PathNode = self.pos_to_node(path[source, :])
@@ -240,7 +240,7 @@ class PlanningToolkit:
         source_vpos: np.ndarray = self.node_to_vpos(source_node)
         dest_vpos: np.ndarray = self.node_to_vpos(dest_node)
 
-        # Test voxels along the chord for their traversibility. If any of them is non-traversible, so is the chord.
+        # Test voxels along the chord for their traversability. If any of them is non-traversable, so is the chord.
         # TODO: Fix and optimise this. It can fail if the chord's very long (through not testing enough points),
         #       and it's needlessly slow. A midpoint line algorithm should be used instead.
         prev_node: Optional[PathNode] = None
@@ -249,24 +249,24 @@ class PlanningToolkit:
             node: PathNode = self.pos_to_node(pos)
             if prev_node is None or node != prev_node:
                 prev_node = node
-                if not self.node_is_traversible(node, use_clearance=use_clearance):
+                if not self.node_is_traversable(node, use_clearance=use_clearance):
                     return False
 
         return True
 
-    def node_is_traversible(self, node: PathNode, *, use_clearance: bool) -> bool:
+    def node_is_traversable(self, node: PathNode, *, use_clearance: bool) -> bool:
         """
         Check whether the specified path node can be traversed.
 
         .. note::
-            The definition of a node's traversibility depends on whether we're requiring there to be sufficient
-            "clearance" around the node or not. If not, a node is traversible if it's "free", which is defined
-            in terms of its occupancy status. If so, a node is traversible if not only is it "free", but so are
+            The definition of a node's traversability depends on whether we're requiring there to be sufficient
+            "clearance" around the node or not. If not, a node is traversable if it's "free", which is defined
+            in terms of its occupancy status. If so, a node is traversable if not only is it "free", but so are
             its immediate neighbours.
 
-        :param node:            The node whose traversibility we want to check.
+        :param node:            The node whose traversability we want to check.
         :param use_clearance:   Whether to require there to be sufficient "clearance" around the node.
-        :return:                True, if the node is traversible, or False otherwise.
+        :return:                True, if the node is traversable, or False otherwise.
         """
         if not self.node_is_free(node):
             return False
@@ -334,7 +334,7 @@ class PlanningToolkit:
 
             # Find the furthest point along the path to which we can directly traverse from the segment start point.
             j: int = i + 2
-            while j < len(path) and self.chord_is_traversible(path, i, j, use_clearance=use_clearance):
+            while j < len(path) and self.chord_is_traversable(path, i, j, use_clearance=use_clearance):
                 j += 1
 
             # Use that as the start of the next segment.
