@@ -1,9 +1,9 @@
 import numpy as np
 
-from smg.pyoctomap import OcTree, OcTreeNode, Vector3
-
 from scipy.interpolate import Akima1DInterpolator
 from typing import Callable, List, Optional, Tuple
+
+from smg.pyoctomap import OcTree, OcTreeNode, Vector3
 
 
 # HELPER ENUMERATIONS
@@ -288,6 +288,30 @@ class PlanningToolkit:
         voxel_size: float = self.__tree.get_resolution()
         half_voxel_size: float = voxel_size / 2.0
         return np.array([node[i] * voxel_size + half_voxel_size for i in range(3)])
+
+    def occupancy_colourer(self) -> Callable[[np.ndarray], np.ndarray]:
+        """
+        Construct a function that can be used to colour waypoints on a path based on their occupancy status.
+
+        .. note::
+            Specifically, waypoints in free space will be coloured green, and all the others will be coloured red.
+
+        :return:    A function that can be used to colour waypoints on a path based on their occupancy status.
+        """
+        def inner(pos: np.ndarray) -> np.ndarray:
+            """
+            A function that can be used to colour waypoints on a path based on their occupancy status.
+
+            :param pos: The position of a waypoint.
+            :return:    The colour to assign to the waypoint.
+            """
+            occupancy: EOccupancyStatus = self.occupancy_status(self.pos_to_node(pos))
+            if occupancy == OCS_FREE:
+                return np.array([0, 1, 0])
+            else:  # in practice, occupancy == OCS_UNKNOWN
+                return np.array([1, 0, 0])
+
+        return inner
 
     def occupancy_status(self, node: PathNode) -> EOccupancyStatus:
         """
