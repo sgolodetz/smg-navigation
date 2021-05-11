@@ -6,7 +6,7 @@ from scipy.interpolate import Akima1DInterpolator
 from typing import Callable, List, Optional, Tuple
 
 
-# HELPER TYPES
+# HELPER ENUMERATIONS
 
 class EOccupancyStatus(int):
     """The occupancy status of an Octomap voxel."""
@@ -37,6 +37,9 @@ OCS_OCCUPIED = EOccupancyStatus(1)
 OCS_UNKNOWN = EOccupancyStatus(2)
 
 
+# HELPER TYPES
+
+# A path planning node, corresponding to a voxel in an Octomap.
 PathNode = Tuple[int, int, int]
 
 
@@ -313,22 +316,28 @@ class PlanningToolkit:
 
     def pull_strings(self, path: np.ndarray, *, use_clearance: bool) -> np.ndarray:
         """
-        TODO
+        Perform "string pulling" on the specified path.
 
-        :param path:            TODO
-        :param use_clearance:   TODO
-        :return:                TODO
+        :param path:            The path on which to perform string pulling.
+        :param use_clearance:   Whether to take "clearance" into account during the string pulling.
+        :return:                The result of performing string pulling on the path.
         """
         pulled_path: List[np.ndarray] = []
 
+        # Start at the beginning of the input path.
         i: int = 0
+
+        # For each segment start point:
         while i < len(path):
+            # Add the segment start point to the output path.
             pulled_path.append(path[i, :])
 
+            # Find the furthest point along the path to which we can directly traverse from the segment start point.
             j: int = i + 2
             while j < len(path) and self.chord_is_traversible(path, i, j, use_clearance=use_clearance):
                 j += 1
 
+            # Use that as the start of the next segment.
             i = j - 1
 
         return np.vstack(pulled_path)
