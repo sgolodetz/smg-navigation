@@ -150,8 +150,8 @@ class AStarPathPlanner:
                 return self.__finalise_path(path, source, goal, pull_strings=pull_strings, use_clearance=use_clearance)
 
             # Otherwise, if we're allowing shortcuts and the goal's in sight:
-            elif allow_shortcuts and self.__toolkit.chord_is_traversable(
-                    np.vstack([current_vpos, goal_vpos]), 0, 1, use_clearance=use_clearance
+            elif allow_shortcuts and self.__toolkit.line_segment_is_traversable(
+                current_vpos, goal_vpos, use_clearance=use_clearance
             ):
                 # Cut the path planning short, and construct and return a path that heads directly for it.
                 path: Deque[np.ndarray] = self.__reconstruct_path(current_node, came_from)

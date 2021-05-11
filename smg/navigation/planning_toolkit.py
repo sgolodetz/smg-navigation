@@ -233,15 +233,24 @@ class PlanningToolkit:
         :param use_clearance:   Whether to require there to be sufficient "clearance" around the chord.
         :return:                True, if the chord is traversable, or False otherwise.
         """
-        # Look up the voxels containing the source and destination points.
         source_node: PathNode = self.pos_to_node(path[source, :])
-        dest_node: PathNode = self.pos_to_node(path[dest, :])
-
         source_vpos: np.ndarray = self.node_to_vpos(source_node)
+        dest_node: PathNode = self.pos_to_node(path[dest, :])
         dest_vpos: np.ndarray = self.node_to_vpos(dest_node)
+        return self.line_segment_is_traversable(source_vpos, dest_vpos, use_clearance=use_clearance)
 
-        # Test voxels along the chord for their traversability. If any of them is non-traversable, so is the chord.
-        # TODO: Fix and optimise this. It can fail if the chord's very long (through not testing enough points),
+    def line_segment_is_traversable(self, source_vpos: np.ndarray, dest_vpos: np.ndarray, *,
+                                    use_clearance: bool) -> bool:
+        """
+        Check whether the specified line segment between two voxel centres can be directly traversed.
+
+        :param source_vpos:     The centre of the source voxel.
+        :param dest_vpos:       The centre of the destination voxel.
+        :param use_clearance:   Whether to require there to be sufficient "clearance" around the line segment.
+        :return:                True, if the line segment is traversable, or False otherwise.
+        """
+        # Test voxels along the segment for their traversability. If any of them is non-traversable, so is the segment.
+        # TODO: Fix and optimise this. It can fail if the segment's very long (through not testing enough points),
         #       and it's needlessly slow. A midpoint line algorithm should be used instead.
         prev_node: Optional[PathNode] = None
         for t in np.linspace(0.0, 1.0, 101):
