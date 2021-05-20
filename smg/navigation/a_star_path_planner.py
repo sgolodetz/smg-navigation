@@ -1,7 +1,7 @@
 import numpy as np
 
 from collections import defaultdict, deque
-from typing import Callable, Deque, Dict, List, Optional
+from typing import Callable, Deque, Dict, List, Optional, Tuple
 
 from smg.utility import PriorityQueue
 
@@ -29,7 +29,7 @@ class AStarPathPlanner:
                        d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                        h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                        allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True) \
-            -> Optional[np.ndarray]:
+            -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
         """
         Try to plan a path that visits the specified set of waypoints.
 
@@ -45,13 +45,14 @@ class AStarPathPlanner:
         :return:                The path, if one was successfully found, or None otherwise.
         """
         multipath: List[np.ndarray] = []
+        multiflags: List[np.ndarray] = []
 
         # For each successive pair of waypoints:
         for i in range(len(waypoints) - 1):
             j: int = i + 1
 
             # Try to plan an individual path between them.
-            path: Optional[np.ndarray] = self.plan_path(
+            path, flags = self.plan_path(
                 waypoints[i], waypoints[j], d=d, h=h,
                 allow_shortcuts=allow_shortcuts,
                 pull_strings=pull_strings,
@@ -62,20 +63,22 @@ class AStarPathPlanner:
             # overall multi-path. Note that we remove the final point (the target waypoint) for all but the last
             # constituent path to avoid the multi-path containing duplicate points.
             if path is None:
-                return None
+                return None, None
             else:
                 if j == len(waypoints) - 1:
                     multipath.append(path)
+                    multiflags.append(flags)
                 else:
                     multipath.append(path[:-1])
+                    multiflags.append(flags[:-1])
 
-        return np.vstack(multipath)
+        return np.vstack(multipath), np.vstack(multiflags)
 
     def plan_path(self, source: np.ndarray, goal: np.ndarray, *,
                   d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                   h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                   allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True) \
-            -> Optional[np.ndarray]:
+            -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
         """
         Try to plan a path from the specified source to the specified goal.
 
@@ -122,12 +125,12 @@ class AStarPathPlanner:
         if not self.__toolkit.node_is_traversable(source_node, use_clearance=use_clearance):
             if self.__debug:
                 print("Source is not traversable")
-            return None
+            return None, None
 
         if not self.__toolkit.node_is_traversable(goal_node, use_clearance=use_clearance):
             if self.__debug:
                 print("Goal is not traversable")
-            return None
+            return None, None
 
         # Search for a path using A*.
         g_scores: Dict[PathNode, float] = defaultdict(lambda: np.infty)
@@ -181,10 +184,11 @@ class AStarPathPlanner:
                     else:
                         frontier.insert(neighbour_node, f_score, None)
 
-        # If the search has failed, return None.
-        return None
+        # Signal that the search has failed.
+        return None, None
 
-    def update_path(self, current_pos: np.ndarray, path: np.ndarray) -> Optional[np.ndarray]:
+    def update_path(self, current_pos: np.ndarray, path: np.ndarray, flags: np.ndarray) \
+            -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
         # TODO
         # FIXME: Find the nearest waypoint only up to and including the next essential one.
         best_waypoint: int = -1
@@ -198,24 +202,21 @@ class AStarPathPlanner:
 
         best_waypoint_pos: np.ndarray = path[best_waypoint, :]
         print(f"Distance to nearest waypoint: {best_distance}")
-        # next_waypoint_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(path[best_waypoint+1, :]))
-        # current_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(current_pos))
         if best_distance <= 0.2:
+            # If we're within striking distance of the best waypoint, prune up to and including it.
             path = np.vstack([path[0, :], path[best_waypoint+1:, :]])
-
-        # next_waypoint_pos: np.ndarray = path[1, :]
-        # next_waypoint_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(next_waypoint_pos))
-        # distance: float = np.linalg.norm(next_waypoint_pos - current_pos)
-        # print(f"Distance to next waypoint: {distance}")
-        # current_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(current_pos))
-        # if distance <= 0.2 and self.__toolkit.line_segment_is_traversable(current_vpos, next_waypoint_vpos, use_clearance=True):
-        #     path = np.vstack([path[0, :], path[2:]])
+        else:
+            # If there's a direct line of sight to the best waypoint, prune the intermediate waypoints.
+            current_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(current_pos))
+            best_waypoint_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(best_waypoint_pos))
+            if self.__toolkit.line_segment_is_traversable(current_vpos, best_waypoint_vpos, use_clearance=True):
+                path = np.vstack([path[0, :], path[best_waypoint:, :]])
 
         if len(path) == 1:
-            return None
+            return None, None
         else:
             ay: float = 10
-            mini_path: Optional[np.ndarray] = self.plan_path(
+            mini_path, mini_flags = self.plan_path(
                 current_pos,
                 path[1, :],
                 d=PlanningToolkit.l1_distance(ay=ay),
@@ -226,14 +227,16 @@ class AStarPathPlanner:
             )
 
             if mini_path is not None:
-                return np.vstack([mini_path[:-1], path[1:, :]])
+                updated_path: np.ndarray = np.vstack([mini_path[:-1], path[1:, :]])
+                updated_flags: np.ndarray = np.vstack([mini_flags[:-1], flags[1:, :]])
+                return self.__toolkit.pull_strings(updated_path, updated_flags, use_clearance=True)
             else:
-                return None
+                return None, None
 
     # PRIVATE METHODS
 
     def __finalise_path(self, path: Deque[np.ndarray], source: np.ndarray, goal: np.ndarray, *,
-                        pull_strings: bool, use_clearance: bool) -> np.ndarray:
+                        pull_strings: bool, use_clearance: bool) -> Tuple[np.ndarray, np.ndarray]:
         """
         Finalise a reconstructed path by adding the source and goal to it, and optionally performing string pulling.
 
@@ -248,11 +251,18 @@ class AStarPathPlanner:
         path.appendleft(source)
         path.append(goal)
 
+        # TODO
+        stacked_path: np.ndarray = np.vstack(path)
+
+        # TODO
+        stacked_flags: np.ndarray = np.zeros((len(path), 1), dtype=bool)
+        stacked_flags[0] = stacked_flags[-1] = True
+
         # Return the path, performing string pulling in the process if requested.
         if pull_strings:
-            return self.__toolkit.pull_strings(np.vstack(path), use_clearance=use_clearance)
+            return self.__toolkit.pull_strings(stacked_path, stacked_flags, use_clearance=use_clearance)
         else:
-            return np.vstack(path)
+            return stacked_path, stacked_flags
 
     def __reconstruct_path(self, goal_node: PathNode, came_from: Dict[PathNode, Optional[PathNode]]) \
             -> Deque[np.ndarray]:

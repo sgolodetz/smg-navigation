@@ -347,15 +347,18 @@ class PlanningToolkit:
         voxel_size: float = self.__tree.get_resolution()
         return tuple(np.round(pos // voxel_size).astype(int))
 
-    def pull_strings(self, path: np.ndarray, *, use_clearance: bool) -> np.ndarray:
+    def pull_strings(self, path: np.ndarray, flags: np.ndarray, *,
+                     use_clearance: bool) -> Tuple[np.ndarray, np.ndarray]:
         """
         Perform "string pulling" on the specified path.
 
         :param path:            The path on which to perform string pulling.
+        :param flags:           TODO
         :param use_clearance:   Whether to take "clearance" into account during the string pulling.
         :return:                The result of performing string pulling on the path.
         """
         pulled_path: List[np.ndarray] = []
+        pulled_flags: List[np.ndarray] = []
 
         # Start at the beginning of the input path.
         i: int = 0
@@ -364,13 +367,23 @@ class PlanningToolkit:
         while i < len(path):
             # Add the segment start point to the output path.
             pulled_path.append(path[i, :])
+            pulled_flags.append(flags[i, :])
+
+            # TODO
+            if i+1 < len(path) and flags[i+1, :]:
+                i = i + 1
+                continue
 
             # Find the furthest point along the path to which we can directly traverse from the segment start point.
             j: int = i + 2
             while j < len(path) and self.chord_is_traversable(path, i, j, use_clearance=use_clearance):
                 j += 1
 
+                # TODO
+                if flags[j-1, :]:
+                    break
+
             # Use that as the start of the next segment.
             i = j - 1
 
-        return np.vstack(pulled_path)
+        return np.vstack(pulled_path), np.vstack(pulled_flags)
