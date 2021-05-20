@@ -207,6 +207,7 @@ class AStarPathPlanner:
         if nearest_waypoint_distance <= 0.2:
             # If we're within striking distance of the nearest waypoint, prune up to and including it.
             path = np.vstack([path[0, :], path[nearest_waypoint+1:, :]])
+            flags = np.vstack([flags[0, :], flags[nearest_waypoint+1:, :]])
         else:
             # If there's a direct line of sight to the nearest waypoint, prune the intermediate waypoints.
             # TODO: Make a pos_to_vpos function.
@@ -214,6 +215,7 @@ class AStarPathPlanner:
             nearest_waypoint_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(nearest_waypoint_pos))
             if self.__toolkit.line_segment_is_traversable(current_vpos, nearest_waypoint_vpos, use_clearance=True):
                 path = np.vstack([path[0, :], path[nearest_waypoint:, :]])
+                flags = np.vstack([flags[0, :], flags[nearest_waypoint:, :]])
 
         if len(path) == 1:
             return None, None
