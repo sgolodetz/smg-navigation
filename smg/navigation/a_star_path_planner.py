@@ -184,6 +184,33 @@ class AStarPathPlanner:
         # If the search has failed, return None.
         return None
 
+    def update_path(self, current_pos: np.ndarray, path: np.ndarray) -> Optional[np.ndarray]:
+        # TODO
+        next_waypoint: np.ndarray = path[1, :]
+        distance: float = np.linalg.norm(next_waypoint - current_pos)
+        print(f"Distance to next waypoint: {distance}")
+        if distance <= 0.2:
+            path = np.vstack([path[0, :], path[2:]])
+
+        if len(path) == 1:
+            return None
+        else:
+            ay: float = 10
+            mini_path: Optional[np.ndarray] = self.plan_path(
+                current_pos,
+                path[1, :],
+                d=PlanningToolkit.l1_distance(ay=ay),
+                h=PlanningToolkit.l1_distance(ay=ay),
+                allow_shortcuts=True,
+                pull_strings=True,
+                use_clearance=True
+            )
+
+            if mini_path is not None:
+                return np.vstack([mini_path[:-1], path[1:, :]])
+            else:
+                return None
+
     # PRIVATE METHODS
 
     def __finalise_path(self, path: Deque[np.ndarray], source: np.ndarray, goal: np.ndarray, *,
