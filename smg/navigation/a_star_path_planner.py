@@ -186,6 +186,7 @@ class AStarPathPlanner:
 
     def update_path(self, current_pos: np.ndarray, path: np.ndarray) -> Optional[np.ndarray]:
         # TODO
+        # FIXME: Find the nearest waypoint only up to and including the next essential one.
         best_waypoint: int = -1
         best_distance: float = np.inf
         for i in range(1, len(path)):
