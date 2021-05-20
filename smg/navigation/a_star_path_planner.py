@@ -191,26 +191,29 @@ class AStarPathPlanner:
             -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
         # TODO
         # FIXME: Find the nearest waypoint only up to and including the next essential one.
-        best_waypoint: int = -1
-        best_distance: float = np.inf
+        nearest_waypoint: int = -1
+        nearest_waypoint_distance: float = np.inf
         for i in range(1, len(path)):
             waypoint_pos: np.ndarray = path[i, :]
             distance: float = np.linalg.norm(waypoint_pos - current_pos)
-            if distance < best_distance:
-                best_waypoint = i
-                best_distance = distance
+            if distance < nearest_waypoint_distance:
+                nearest_waypoint = i
+                nearest_waypoint_distance = distance
+            if flags[i, :]:
+                break
 
-        best_waypoint_pos: np.ndarray = path[best_waypoint, :]
-        print(f"Distance to nearest waypoint: {best_distance}")
-        if best_distance <= 0.2:
-            # If we're within striking distance of the best waypoint, prune up to and including it.
-            path = np.vstack([path[0, :], path[best_waypoint+1:, :]])
+        nearest_waypoint_pos: np.ndarray = path[nearest_waypoint, :]
+        print(f"Distance to nearest waypoint: {nearest_waypoint_distance}")
+        if nearest_waypoint_distance <= 0.2:
+            # If we're within striking distance of the nearest waypoint, prune up to and including it.
+            path = np.vstack([path[0, :], path[nearest_waypoint+1:, :]])
         else:
-            # If there's a direct line of sight to the best waypoint, prune the intermediate waypoints.
+            # If there's a direct line of sight to the nearest waypoint, prune the intermediate waypoints.
+            # TODO: Make a pos_to_vpos function.
             current_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(current_pos))
-            best_waypoint_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(best_waypoint_pos))
-            if self.__toolkit.line_segment_is_traversable(current_vpos, best_waypoint_vpos, use_clearance=True):
-                path = np.vstack([path[0, :], path[best_waypoint:, :]])
+            nearest_waypoint_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(nearest_waypoint_pos))
+            if self.__toolkit.line_segment_is_traversable(current_vpos, nearest_waypoint_vpos, use_clearance=True):
+                path = np.vstack([path[0, :], path[nearest_waypoint:, :]])
 
         if len(path) == 1:
             return None, None
@@ -221,7 +224,7 @@ class AStarPathPlanner:
                 path[1, :],
                 d=PlanningToolkit.l1_distance(ay=ay),
                 h=PlanningToolkit.l1_distance(ay=ay),
-                allow_shortcuts=True,
+                allow_shortcuts=True,  # TODO: Parameterise all of these.
                 pull_strings=True,
                 use_clearance=True
             )
@@ -229,6 +232,7 @@ class AStarPathPlanner:
             if mini_path is not None:
                 updated_path: np.ndarray = np.vstack([mini_path[:-1], path[1:, :]])
                 updated_flags: np.ndarray = np.vstack([mini_flags[:-1], flags[1:, :]])
+                # TODO: Only pull strings and use clearance if requested.
                 return self.__toolkit.pull_strings(updated_path, updated_flags, use_clearance=True)
             else:
                 return None, None
