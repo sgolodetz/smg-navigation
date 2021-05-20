@@ -186,10 +186,12 @@ class AStarPathPlanner:
 
     def update_path(self, current_pos: np.ndarray, path: np.ndarray) -> Optional[np.ndarray]:
         # TODO
-        next_waypoint: np.ndarray = path[1, :]
-        distance: float = np.linalg.norm(next_waypoint - current_pos)
+        next_waypoint_pos: np.ndarray = path[1, :]
+        next_waypoint_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(next_waypoint_pos))
+        distance: float = np.linalg.norm(next_waypoint_pos - current_pos)
         print(f"Distance to next waypoint: {distance}")
-        if distance <= 0.2:
+        current_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(current_pos))
+        if distance <= 0.2 and self.__toolkit.line_segment_is_traversable(current_vpos, next_waypoint_vpos, use_clearance=True):
             path = np.vstack([path[0, :], path[2:]])
 
         if len(path) == 1:
