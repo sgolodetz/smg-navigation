@@ -7,16 +7,22 @@ from smg.opengl import OpenGLUtil
 
 
 class Path:
-    """A path."""
+    """A navigation path."""
 
     # NESTED TYPES
 
-    class Element:
-        """A path element."""
+    class Waypoint:
+        """A waypoint along a navigation path."""
 
         # CONSTRUCTOR
 
         def __init__(self, position: np.ndarray, is_essential: bool):
+            """
+            Construct a waypoint.
+
+            :param position:        The 3D position of the waypoint.
+            :param is_essential:    Whether or not the waypoint is essential to the path or can be smoothed away.
+            """
             self.__position: np.ndarray = position
             self.__is_essential: bool = is_essential
 
@@ -24,34 +30,74 @@ class Path:
 
         @property
         def is_essential(self) -> bool:
+            """
+            Get whether or not the waypoint is essential to the path or can be smoothed away.
+
+            :return:    True, if it is essential, or False otherwise.
+            """
             return self.__is_essential
 
         @property
         def position(self) -> np.ndarray:
+            """
+            Get the 3D position of the waypoint.
+
+            :return:    The 3D position of the waypoint.
+            """
             return self.__position
 
     # CONSTRUCTOR
 
     def __init__(self, positions: np.ndarray, essential_flags: np.ndarray):
+        """
+        Construct a navigation path.
+
+        :param positions:       The 3D positions of the path's waypoints.
+        :param essential_flags: An array of flags indicating which waypoints are essential to the path.
+        """
         self.__positions: np.ndarray = positions
         self.__essential_flags: np.ndarray = essential_flags
 
     # SPECIAL METHODS
 
-    def __getitem__(self, idx) -> Element:
-        return Path.Element(self.__positions[idx, :], self.__essential_flags[idx].item())
+    def __getitem__(self, i) -> Waypoint:
+        """
+        Get the i'th waypoint of the path.
+
+        :param i:   The index of the waypoint to get.
+        :return:    The i'th waypoint of the path.
+        """
+        return Path.Waypoint(self.__positions[i], self.__essential_flags[i].item())
 
     def __len__(self) -> int:
+        """
+        Get the length of the path (i.e. the number of waypoints it contains).
+
+        .. note::
+            Just to be absolutely clear, this doesn't return the arc length of the path!
+
+        :return:    The length of the path (i.e. the number of waypoints it contains).
+        """
         return len(self.__positions)
 
     # PROPERTIES
 
     @property
     def essential_flags(self) -> np.ndarray:
+        """
+        Get an array of flags indicating which waypoints are essential to the path.
+
+        :return:    An array of flags indicating which waypoints are essential to the path.
+        """
         return self.__essential_flags
 
     @property
     def positions(self) -> np.ndarray:
+        """
+        Get the 3D positions of the path's waypoints.
+
+        :return:    The 3D positions of the path's waypoints.
+        """
         return self.__positions
 
     # PUBLIC METHODS
