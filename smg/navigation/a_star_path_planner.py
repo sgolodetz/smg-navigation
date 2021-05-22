@@ -1,7 +1,7 @@
 import numpy as np
 
 from collections import defaultdict, deque
-from typing import Callable, Deque, Dict, List, Optional, Tuple
+from typing import Callable, Deque, Dict, List, Optional
 
 from smg.utility import PriorityQueue
 
@@ -85,9 +85,6 @@ class AStarPathPlanner:
 
         .. note::
             See PlanningToolkit.node_is_traversable for the definition of what "clearance" means in this case.
-        .. note::
-            The auxiliary data currently used consists of an array of flags, one for each path node. The flag
-            for a node indicates whether or not it is an essential part of the path (True = yes, False = no).
 
         :param source:          The source (a 3D point in space).
         :param goal:            The goal (a 3D point in space).
@@ -96,8 +93,7 @@ class AStarPathPlanner:
         :param allow_shortcuts: Whether or not to allow shortcutting when the goal is in sight.
         :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:   Whether or not to plan a path that has sufficient "clearance" around it.
-        :return:                A tuple consisting of the path and any auxiliary data about its nodes,
-                                if a path was successfully found, or None otherwise.
+        :return:                The path, if one was successfully found, or None otherwise.
         """
         # Loosely based on an amalgam of:
         #
@@ -189,7 +185,7 @@ class AStarPathPlanner:
                     else:
                         frontier.insert(neighbour_node, f_score, None)
 
-        # Signal that the search has failed.
+        # If the search has failed, return None.
         return None
 
     def update_path(self, current_pos: np.ndarray, path: Path, *,
@@ -234,11 +230,11 @@ class AStarPathPlanner:
             # is the goal, then the path will be left with only a single waypoint.
             path = path.straighten_before(nearest_waypoint_idx + 1)
         else:
-            # Otherwise, if there's a direct line of sight to the nearest waypoint, straighten the path up to
-            # and including it.
+            # Otherwise, if there's a direct line of sight to the nearest waypoint:
             current_vpos: np.ndarray = self.__toolkit.pos_to_vpos(current_pos)
             nearest_waypoint_vpos: np.ndarray = self.__toolkit.pos_to_vpos(path[nearest_waypoint_idx].position)
             if self.__toolkit.line_segment_is_traversable(current_vpos, nearest_waypoint_vpos, use_clearance=True):
+                # Straighten the path up to and including the nearest waypoint.
                 path = path.straighten_before(nearest_waypoint_idx)
 
         # If the path now has only a single waypoint:
@@ -249,17 +245,15 @@ class AStarPathPlanner:
             # Otherwise, try to plan a new sub-path from the current position to the next waypoint.
             new_subpath: Optional[Path] = self.plan_single_step_path(
                 current_pos, path[1].position, d=d, h=h,
-                allow_shortcuts=allow_shortcuts,
-                pull_strings=pull_strings,
-                use_clearance=use_clearance
+                allow_shortcuts=allow_shortcuts, pull_strings=pull_strings, use_clearance=use_clearance
             )
 
-            # If that succeeds:
+            # If that succeeded:
             if new_subpath is not None:
                 # Replace the existing sub-path to the next waypoint with the new one.
                 updated_path: Path = path.replace_before(1, new_subpath)
 
-                # Then, return the updated path, performing string pulling in the process if requested.
+                # Return the updated path, performing string pulling in the process if requested.
                 if pull_strings:
                     return self.__toolkit.pull_strings(updated_path, use_clearance=use_clearance)
                 else:
@@ -275,7 +269,7 @@ class AStarPathPlanner:
         """
         Finalise a reconstructed path by adding the source and goal to it, and optionally performing string pulling.
 
-        :param positions:       The 3D positions of the nodes on the path.
+        :param positions:       The 3D positions of the path's waypoints.
         :param source:          The source (a 3D point in space).
         :param goal:            The goal (a 3D point in space).
         :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
@@ -286,9 +280,9 @@ class AStarPathPlanner:
         positions.appendleft(source)
         positions.append(goal)
 
-        # Make the "essential flags" for the path, namely a flag for each node indicating whether or not the node
-        # is an essential part of the path (or can be smoothed away). For a simple path, the source and goal are
-        # essential, but the waypoints in between aren't.
+        # Make the "essential flags" for the path, namely a flag for each waypoint indicating whether or not the
+        # waypoint is an essential part of the path (or can be smoothed away). For a simple path, the source and
+        # goal are essential, but the waypoints in between aren't.
         essential_flags: np.ndarray = np.zeros((len(positions), 1), dtype=bool)
         essential_flags[0] = essential_flags[-1] = True
 

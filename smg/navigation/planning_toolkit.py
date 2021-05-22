@@ -365,7 +365,7 @@ class PlanningToolkit:
             pulled_essential_flags.append(path[i].is_essential)
 
             # If the next point along the path is essential, use it as the start of the next segment.
-            if i+1 < len(path) and path[i+1].is_essential:
+            if i + 1 < len(path) and path[i + 1].is_essential:
                 i = i + 1
                 continue
 
@@ -375,7 +375,7 @@ class PlanningToolkit:
                 j += 1
 
                 # If we encounter an essential node, that's as far as we can go for this segment.
-                if path[j-1].is_essential:
+                if path[j - 1].is_essential:
                     break
 
             # Use the furthest point to which we were able to directly traverse as the start of the next segment.

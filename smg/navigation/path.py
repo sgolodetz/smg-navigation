@@ -143,7 +143,7 @@ class Path:
         for i in range(len(self)):
             t: float = i / (len(self) - 1)
             colour: np.ndarray = (1 - t) * start_colour + t * end_colour
-            pos: np.ndarray = self.positions[i, :]
+            pos: np.ndarray = self.positions[i]
 
             glColor3f(*colour)
             glVertex3f(*pos)
