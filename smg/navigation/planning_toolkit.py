@@ -353,10 +353,10 @@ class PlanningToolkit:
 
     def pos_to_vpos(self, pos: np.ndarray) -> np.ndarray:
         """
-        TODO
+        Compute the position of the centre of the voxel that contains the specified position.
 
-        :param pos: TODO
-        :return:    TODO
+        :param pos: The position.
+        :return:    The position of the centre of the voxel that contains it.
         """
         return self.node_to_vpos(self.pos_to_node(pos))
 

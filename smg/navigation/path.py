@@ -141,25 +141,28 @@ class Path:
                 glColor3f(*waypoint_colourer(pos))
                 OpenGLUtil.render_sphere(pos, 0.01, slices=10, stacks=10)
 
-    def replace_before(self, waypoint_idx: int, minipath: Path) -> Path:
+    def replace_before(self, waypoint_idx: int, new_subpath: Path) -> Path:
         """
-        TODO
+        Make a copy of the path in which the sub-path prior to the specified waypoint has been replaced
+        with a new sub-path.
 
-        :param waypoint_idx:    TODO
-        :param minipath:        TODO
-        :return:                TODO
+        :param waypoint_idx:    The index of the waypoint at the start of the remainder of the path.
+        :param new_subpath:     The new sub-path to substitute for the sub-path before the specified waypoint.
+        :return:                A copy of the path in which the sub-path prior to the specified waypoint has
+                                been replaced with the new sub-path.
         """
         return Path(
-            np.vstack([minipath.positions[:-1], self.__positions[waypoint_idx:]]),
-            np.vstack([minipath.essential_flags[:-1], self.__essential_flags[waypoint_idx:]])
+            np.vstack([new_subpath.positions[:-1], self.__positions[waypoint_idx:]]),
+            np.vstack([new_subpath.essential_flags[:-1], self.__essential_flags[waypoint_idx:]])
         )
 
     def straighten_before(self, waypoint_idx: int) -> Path:
         """
-        TODO
+        Make a copy of the path in which the source is the only waypoint retained prior to the specified waypoint.
 
-        :param waypoint_idx:    TODO
-        :return:                TODO
+        :param waypoint_idx:    The index of the waypoint at the start of the remainder of the path.
+        :return:                A copy of the path in which the source is the only waypoint retained prior to
+                                the specified waypoint.
         """
         return Path(
             np.vstack([self.__positions[0], self.__positions[waypoint_idx:]]),

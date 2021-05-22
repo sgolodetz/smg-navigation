@@ -228,38 +228,44 @@ class AStarPathPlanner:
 
         print(f"Distance to nearest waypoint: {nearest_waypoint_dist}")
 
-        # TODO
+        # If we're within striking distance of the nearest waypoint:
         if nearest_waypoint_dist <= 0.2:
-            # If we're within striking distance of the nearest waypoint, straighten the path up to and including
-            # its successor.
+            # Straighten the path up to and including its successor (if any). Note that if the nearest waypoint
+            # is the goal, then the path will be left with only a single waypoint.
             path = path.straighten_before(nearest_waypoint_idx + 1)
         else:
-            # If there's a direct line of sight to the nearest waypoint, straight the path up to and including it.
+            # Otherwise, if there's a direct line of sight to the nearest waypoint, straighten the path up to
+            # and including it.
             current_vpos: np.ndarray = self.__toolkit.pos_to_vpos(current_pos)
             nearest_waypoint_vpos: np.ndarray = self.__toolkit.pos_to_vpos(path[nearest_waypoint_idx].position)
             if self.__toolkit.line_segment_is_traversable(current_vpos, nearest_waypoint_vpos, use_clearance=True):
                 path = path.straighten_before(nearest_waypoint_idx)
 
+        # If the path now has only a single waypoint:
         if len(path) == 1:
+            # We've reached the goal, so there's no need for a path any more.
             return None
         else:
-            minipath: Optional[Path] = self.plan_single_step_path(
+            # Otherwise, try to plan a new sub-path from the current position to the next waypoint.
+            new_subpath: Optional[Path] = self.plan_single_step_path(
                 current_pos, path[1].position, d=d, h=h,
                 allow_shortcuts=allow_shortcuts,
                 pull_strings=pull_strings,
                 use_clearance=use_clearance
             )
 
-            if minipath is not None:
-                # TODO
-                updated_path: Path = path.replace_before(1, minipath)
+            # If that succeeds:
+            if new_subpath is not None:
+                # Replace the existing sub-path to the next waypoint with the new one.
+                updated_path: Path = path.replace_before(1, new_subpath)
 
-                # TODO
+                # Then, return the updated path, performing string pulling in the process if requested.
                 if pull_strings:
                     return self.__toolkit.pull_strings(updated_path, use_clearance=use_clearance)
                 else:
                     return updated_path
             else:
+                # If a new sub-path couldn't be found, the path update has failed, so return None.
                 return None
 
     # PRIVATE METHODS
