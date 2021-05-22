@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from OpenGL.GL import *
+from scipy.interpolate import Akima1DInterpolator
 from typing import Callable, Optional
 
 from smg.opengl import OpenGLUtil
@@ -103,6 +104,19 @@ class Path:
         return self.__positions
 
     # PUBLIC METHODS
+
+    def interpolate(self, *, new_length: int = 100) -> Path:
+        """
+        Make a smoother version of the path by using curve fitting and interpolation.
+
+        :param new_length:  The number of points to take from the interpolating curve.
+        :return:            The interpolated path.
+        """
+        x: np.ndarray = np.arange(len(self))
+        cs: Akima1DInterpolator = Akima1DInterpolator(x, self.__positions)
+        essential_flags: np.ndarray = np.zeros((new_length, 1), dtype=bool)
+        essential_flags[0] = essential_flags[-1] = True
+        return Path(cs(np.linspace(0, len(self) - 1, new_length)), essential_flags)
 
     def render(self, *, start_colour, end_colour, width: int = 1,
                waypoint_colourer: Optional[Callable[[np.ndarray], np.ndarray]] = None) -> None:

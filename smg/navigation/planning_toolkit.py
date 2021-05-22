@@ -1,6 +1,5 @@
 import numpy as np
 
-from scipy.interpolate import Akima1DInterpolator
 from typing import Callable, List, Optional, Tuple
 
 from smg.pyoctomap import OcTree, OcTreeNode, Vector3
@@ -75,21 +74,6 @@ class PlanningToolkit:
         self.node_is_free: Callable[[PathNode], bool] = node_is_free
 
     # PUBLIC STATIC METHODS
-
-    @staticmethod
-    def interpolate_path(path: Path, *, new_length: int = 100) -> Path:
-        """
-        Make a smoother version of a path by using curve fitting and interpolation.
-
-        :param path:        The original path.
-        :param new_length:  The number of points to take from the interpolating curve.
-        :return:            The interpolated path.
-        """
-        x: np.ndarray = np.arange(len(path))
-        cs: Akima1DInterpolator = Akima1DInterpolator(x, path.positions)
-        essential_flags: np.ndarray = np.zeros((new_length, 1), dtype=bool)
-        essential_flags[0] = essential_flags[-1] = True
-        return Path(cs(np.linspace(0, len(path) - 1, new_length)), essential_flags)
 
     @staticmethod
     def l1_distance(*, ax: float = 1.0, ay: float = 1.0, az: float = 1.0) -> Callable[[np.ndarray, np.ndarray], float]:
