@@ -26,13 +26,13 @@ class AStarPathPlanner:
 
     # PUBLIC METHODS
 
-    def plan_multipath(self, waypoints: List[np.ndarray],
-                       d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                       h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                       allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True) \
-            -> Optional[Path]:
+    def plan_multi_step_path(self, waypoints: List[np.ndarray],
+                             d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                             h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                             allow_shortcuts: bool = True, pull_strings: bool = True,
+                             use_clearance: bool = True) -> Optional[Path]:
         """
-        Try to plan a path that visits the specified set of waypoints.
+        Try to plan a path that visits the specified list of waypoints.
 
         .. note::
             See PlanningToolkit.node_is_traversable for the definition of what "clearance" means in this case.
@@ -52,8 +52,8 @@ class AStarPathPlanner:
         for i in range(len(waypoints) - 1):
             j: int = i + 1
 
-            # Try to plan an individual path between them.
-            path: Optional[Path] = self.plan_path(
+            # Try to plan a path between them.
+            path: Optional[Path] = self.plan_single_step_path(
                 waypoints[i], waypoints[j], d=d, h=h,
                 allow_shortcuts=allow_shortcuts,
                 pull_strings=pull_strings,
@@ -75,11 +75,11 @@ class AStarPathPlanner:
 
         return Path(np.vstack(multipath_positions), np.vstack(multipath_essential_flags))
 
-    def plan_path(self, source: np.ndarray, goal: np.ndarray, *,
-                  d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                  h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                  allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True) \
-            -> Optional[Path]:
+    def plan_single_step_path(self, source: np.ndarray, goal: np.ndarray, *,
+                              d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                              h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                              allow_shortcuts: bool = True, pull_strings: bool = True,
+                              use_clearance: bool = True) -> Optional[Path]:
         """
         Try to plan a path from the specified source to the specified goal.
 
@@ -192,13 +192,12 @@ class AStarPathPlanner:
         # Signal that the search has failed.
         return None
 
-    def update_multipath(self, current_pos: np.ndarray, path: Path, *,
-                         d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                         h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                         allow_shortcuts: bool, pull_strings: bool, use_clearance: bool) -> Optional[Path]:
+    def update_path(self, current_pos: np.ndarray, path: Path, *,
+                    d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                    h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                    allow_shortcuts: bool, pull_strings: bool, use_clearance: bool) -> Optional[Path]:
         """
-        Try to update the specified path (which may have multiple essential waypoints) based on the agent's
-        current position.
+        Try to update the specified path based on the agent's current position.
 
         :param current_pos:     The current position of the agent.
         :param path:            The path to update.
@@ -210,7 +209,7 @@ class AStarPathPlanner:
         :return:                The updated path, if successful, or None otherwise.
         """
         # Find the nearest waypoint of those on the path up to and including the next essential one.
-        nearest_waypoint: int = -1
+        nearest_waypoint_idx: int = -1
         nearest_waypoint_dist: float = np.inf
 
         # For each waypoint beyond the agent's current position:
@@ -220,7 +219,7 @@ class AStarPathPlanner:
 
             # If the waypoint is the best we've seen so far, record it.
             if waypoint_dist < nearest_waypoint_dist:
-                nearest_waypoint = i
+                nearest_waypoint_idx = i
                 nearest_waypoint_dist = waypoint_dist
 
             # Stop if we reach an essential waypoint.
@@ -230,30 +229,21 @@ class AStarPathPlanner:
         print(f"Distance to nearest waypoint: {nearest_waypoint_dist}")
 
         # TODO
-        nearest_waypoint_pos: np.ndarray = path[nearest_waypoint].position
         if nearest_waypoint_dist <= 0.2:
-            # If we're within striking distance of the nearest waypoint, prune up to and including it.
-            # TODO: Make this pruning into a method of Path.
-            path = Path(
-                np.vstack([path.positions[0], path.positions[nearest_waypoint+1:]]),
-                np.vstack([path.essential_flags[0], path.essential_flags[nearest_waypoint+1:]])
-            )
+            # If we're within striking distance of the nearest waypoint, straighten the path up to and including
+            # its successor.
+            path = path.straighten_before(nearest_waypoint_idx + 1)
         else:
-            # If there's a direct line of sight to the nearest waypoint, prune the intermediate waypoints.
-            # TODO: Make a pos_to_vpos function.
-            current_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(current_pos))
-            nearest_waypoint_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(nearest_waypoint_pos))
+            # If there's a direct line of sight to the nearest waypoint, straight the path up to and including it.
+            current_vpos: np.ndarray = self.__toolkit.pos_to_vpos(current_pos)
+            nearest_waypoint_vpos: np.ndarray = self.__toolkit.pos_to_vpos(path[nearest_waypoint_idx].position)
             if self.__toolkit.line_segment_is_traversable(current_vpos, nearest_waypoint_vpos, use_clearance=True):
-                # TODO: Make this pruning into a method of Path.
-                path = Path(
-                    np.vstack([path.positions[0], path.positions[nearest_waypoint:]]),
-                    np.vstack([path.essential_flags[0], path.essential_flags[nearest_waypoint:]])
-                )
+                path = path.straighten_before(nearest_waypoint_idx)
 
         if len(path) == 1:
             return None
         else:
-            minipath: Optional[Path] = self.plan_path(
+            minipath: Optional[Path] = self.plan_single_step_path(
                 current_pos, path[1].position, d=d, h=h,
                 allow_shortcuts=allow_shortcuts,
                 pull_strings=pull_strings,
@@ -261,13 +251,14 @@ class AStarPathPlanner:
             )
 
             if minipath is not None:
-                # TODO: Make this splicing into a method of Path.
-                updated_path: Path = Path(
-                    np.vstack([minipath.positions[:-1], path.positions[1:]]),
-                    np.vstack([minipath.essential_flags[:-1], path.essential_flags[1:]])
-                )
-                # TODO: Only pull strings if requested.
-                return self.__toolkit.pull_strings(updated_path, use_clearance=use_clearance)
+                # TODO
+                updated_path: Path = path.replace_before(1, minipath)
+
+                # TODO
+                if pull_strings:
+                    return self.__toolkit.pull_strings(updated_path, use_clearance=use_clearance)
+                else:
+                    return updated_path
             else:
                 return None
 

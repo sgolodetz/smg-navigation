@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 
 from OpenGL.GL import *
@@ -138,3 +140,28 @@ class Path:
             for pos in self.positions:
                 glColor3f(*waypoint_colourer(pos))
                 OpenGLUtil.render_sphere(pos, 0.01, slices=10, stacks=10)
+
+    def replace_before(self, waypoint_idx: int, minipath: Path) -> Path:
+        """
+        TODO
+
+        :param waypoint_idx:    TODO
+        :param minipath:        TODO
+        :return:                TODO
+        """
+        return Path(
+            np.vstack([minipath.positions[:-1], self.__positions[waypoint_idx:]]),
+            np.vstack([minipath.essential_flags[:-1], self.__essential_flags[waypoint_idx:]])
+        )
+
+    def straighten_before(self, waypoint_idx: int) -> Path:
+        """
+        TODO
+
+        :param waypoint_idx:    TODO
+        :return:                TODO
+        """
+        return Path(
+            np.vstack([self.__positions[0], self.__positions[waypoint_idx:]]),
+            np.vstack([self.__essential_flags[0], self.__essential_flags[waypoint_idx:]])
+        )

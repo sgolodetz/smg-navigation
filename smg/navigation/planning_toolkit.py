@@ -351,6 +351,15 @@ class PlanningToolkit:
         voxel_size: float = self.__tree.get_resolution()
         return tuple(np.round(pos // voxel_size).astype(int))
 
+    def pos_to_vpos(self, pos: np.ndarray) -> np.ndarray:
+        """
+        TODO
+
+        :param pos: TODO
+        :return:    TODO
+        """
+        return self.node_to_vpos(self.pos_to_node(pos))
+
     def pull_strings(self, path: Path, *, use_clearance: bool) -> Path:
         """
         Perform "string pulling" on the specified path.
