@@ -5,6 +5,8 @@ from typing import Callable, List, Optional, Tuple
 
 from smg.pyoctomap import OcTree, OcTreeNode, Vector3
 
+from .path import Path
+
 
 # HELPER ENUMERATIONS
 
@@ -75,7 +77,7 @@ class PlanningToolkit:
     # PUBLIC STATIC METHODS
 
     @staticmethod
-    def interpolate_path(path: np.ndarray, *, new_length: int = 100) -> np.ndarray:
+    def interpolate_path(path: Path, *, new_length: int = 100) -> Path:
         """
         Make a smoother version of a path by using curve fitting and interpolation.
 
@@ -84,8 +86,10 @@ class PlanningToolkit:
         :return:            The interpolated path.
         """
         x: np.ndarray = np.arange(len(path))
-        cs: Akima1DInterpolator = Akima1DInterpolator(x, path)
-        return cs(np.linspace(0, len(path) - 1, new_length))
+        cs: Akima1DInterpolator = Akima1DInterpolator(x, path.positions)
+        essential_flags: np.ndarray = np.zeros((new_length, 1), dtype=bool)
+        essential_flags[0] = essential_flags[-1] = True
+        return Path(cs(np.linspace(0, len(path) - 1, new_length)), essential_flags)
 
     @staticmethod
     def l1_distance(*, ax: float = 1.0, ay: float = 1.0, az: float = 1.0) -> Callable[[np.ndarray, np.ndarray], float]:
@@ -223,7 +227,7 @@ class PlanningToolkit:
 
     # PUBLIC METHODS
 
-    def chord_is_traversable(self, path: np.ndarray, source: int, dest: int, *, use_clearance: bool) -> bool:
+    def chord_is_traversable(self, path: Path, source: int, dest: int, *, use_clearance: bool) -> bool:
         """
         Check whether the specified (straight line) chord between two points on a path can be directly traversed.
 
@@ -233,9 +237,9 @@ class PlanningToolkit:
         :param use_clearance:   Whether to require there to be sufficient "clearance" around the chord.
         :return:                True, if the chord is traversable, or False otherwise.
         """
-        source_node: PathNode = self.pos_to_node(path[source, :])
+        source_node: PathNode = self.pos_to_node(path[source].position)
         source_vpos: np.ndarray = self.node_to_vpos(source_node)
-        dest_node: PathNode = self.pos_to_node(path[dest, :])
+        dest_node: PathNode = self.pos_to_node(path[dest].position)
         dest_vpos: np.ndarray = self.node_to_vpos(dest_node)
         return self.line_segment_is_traversable(source_vpos, dest_vpos, use_clearance=use_clearance)
 
@@ -347,18 +351,16 @@ class PlanningToolkit:
         voxel_size: float = self.__tree.get_resolution()
         return tuple(np.round(pos // voxel_size).astype(int))
 
-    def pull_strings(self, path: np.ndarray, path_aux: np.ndarray, *,
-                     use_clearance: bool) -> Tuple[np.ndarray, np.ndarray]:
+    def pull_strings(self, path: Path, *, use_clearance: bool) -> Path:
         """
         Perform "string pulling" on the specified path.
 
         :param path:            The path on which to perform string pulling.
-        :param path_aux:        The auxiliary data for the path.
         :param use_clearance:   Whether to take "clearance" into account during the string pulling.
         :return:                The result of performing string pulling on the path.
         """
-        pulled_path: List[np.ndarray] = []
-        pulled_path_aux: List[np.ndarray] = []
+        pulled_positions: List[np.ndarray] = []
+        pulled_essential_flags: List[bool] = []
 
         # Start at the beginning of the input path.
         i: int = 0
@@ -366,11 +368,11 @@ class PlanningToolkit:
         # For each segment start point:
         while i < len(path):
             # Add the segment start point to the output path.
-            pulled_path.append(path[i, :])
-            pulled_path_aux.append(path_aux[i, :])
+            pulled_positions.append(path[i].position)
+            pulled_essential_flags.append(path[i].is_essential)
 
             # If the next point along the path is essential, use it as the start of the next segment.
-            if i+1 < len(path) and path_aux[i + 1].item():
+            if i+1 < len(path) and path[i+1].is_essential:
                 i = i + 1
                 continue
 
@@ -380,10 +382,10 @@ class PlanningToolkit:
                 j += 1
 
                 # If we encounter an essential node, that's as far as we can go for this segment.
-                if path_aux[j - 1].item():
+                if path[j-1].is_essential:
                     break
 
             # Use the furthest point to which we were able to directly traverse as the start of the next segment.
             i = j - 1
 
-        return np.vstack(pulled_path), np.vstack(pulled_path_aux)
+        return Path(np.vstack(pulled_positions), np.vstack(pulled_essential_flags))

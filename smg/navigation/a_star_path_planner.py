@@ -5,6 +5,7 @@ from typing import Callable, Deque, Dict, List, Optional, Tuple
 
 from smg.utility import PriorityQueue
 
+from .path import Path
 from .planning_toolkit import EOccupancyStatus, PathNode, PlanningToolkit
 
 
@@ -29,7 +30,7 @@ class AStarPathPlanner:
                        d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                        h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                        allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True) \
-            -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+            -> Optional[Path]:
         """
         Try to plan a path that visits the specified set of waypoints.
 
@@ -44,15 +45,15 @@ class AStarPathPlanner:
         :param use_clearance:   Whether or not to plan a path that has sufficient "clearance" around it.
         :return:                The path, if one was successfully found, or None otherwise.
         """
-        multipath: List[np.ndarray] = []
-        multipath_aux: List[np.ndarray] = []
+        multipath_positions: List[np.ndarray] = []
+        multipath_essential_flags: List[np.ndarray] = []
 
         # For each successive pair of waypoints:
         for i in range(len(waypoints) - 1):
             j: int = i + 1
 
             # Try to plan an individual path between them.
-            path, path_aux = self.plan_path(
+            path: Optional[Path] = self.plan_path(
                 waypoints[i], waypoints[j], d=d, h=h,
                 allow_shortcuts=allow_shortcuts,
                 pull_strings=pull_strings,
@@ -63,22 +64,22 @@ class AStarPathPlanner:
             # overall multi-path. Note that we remove the final point (the target waypoint) for all but the last
             # constituent path to avoid the multi-path containing duplicate points.
             if path is None:
-                return None, None
+                return None
             else:
                 if j == len(waypoints) - 1:
-                    multipath.append(path)
-                    multipath_aux.append(path_aux)
+                    multipath_positions.append(path.positions)
+                    multipath_essential_flags.append(path.essential_flags)
                 else:
-                    multipath.append(path[:-1])
-                    multipath_aux.append(path_aux[:-1])
+                    multipath_positions.append(path.positions[:-1])
+                    multipath_essential_flags.append(path.essential_flags[:-1])
 
-        return np.vstack(multipath), np.vstack(multipath_aux)
+        return Path(np.vstack(multipath_positions), np.vstack(multipath_essential_flags))
 
     def plan_path(self, source: np.ndarray, goal: np.ndarray, *,
                   d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                   h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                   allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True) \
-            -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+            -> Optional[Path]:
         """
         Try to plan a path from the specified source to the specified goal.
 
@@ -129,12 +130,12 @@ class AStarPathPlanner:
         if not self.__toolkit.node_is_traversable(source_node, use_clearance=use_clearance):
             if self.__debug:
                 print("Source is not traversable")
-            return None, None
+            return None
 
         if not self.__toolkit.node_is_traversable(goal_node, use_clearance=use_clearance):
             if self.__debug:
                 print("Goal is not traversable")
-            return None, None
+            return None
 
         # Search for a path using A*.
         g_scores: Dict[PathNode, float] = defaultdict(lambda: np.infty)
@@ -189,27 +190,24 @@ class AStarPathPlanner:
                         frontier.insert(neighbour_node, f_score, None)
 
         # Signal that the search has failed.
-        return None, None
+        return None
 
-    def update_multipath(self, current_pos: np.ndarray, path: np.ndarray, path_aux: np.ndarray, *,
+    def update_multipath(self, current_pos: np.ndarray, path: Path, *,
                          d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                          h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                         allow_shortcuts: bool, pull_strings: bool, use_clearance: bool) \
-            -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+                         allow_shortcuts: bool, pull_strings: bool, use_clearance: bool) -> Optional[Path]:
         """
         Try to update the specified path (which may have multiple essential waypoints) based on the agent's
         current position.
 
         :param current_pos:     The current position of the agent.
         :param path:            The path to update.
-        :param path_aux:        The auxiliary data for the path to update.
         :param d:               An optional distance function (if None, L1 distance will be used).
         :param h:               An optional heuristic function (if None, L1 distance will be used).
         :param allow_shortcuts: Whether or not to allow shortcutting when the goal is in sight.
         :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:   Whether or not to take "clearance" around the path into account when updating it.
-        :return:                A tuple consisting of the path and any auxiliary data about its nodes,
-                                if the path was successfully updated, or None otherwise.
+        :return:                The updated path, if successful, or None otherwise.
         """
         # Find the nearest waypoint of those on the path up to and including the next essential one.
         nearest_waypoint: int = -1
@@ -218,8 +216,7 @@ class AStarPathPlanner:
         # For each waypoint beyond the agent's current position:
         for i in range(1, len(path)):
             # Find the distance between the agent and the waypoint.
-            waypoint_pos: np.ndarray = path[i, :]
-            waypoint_dist: float = np.linalg.norm(waypoint_pos - current_pos)
+            waypoint_dist: float = np.linalg.norm(path[i].position - current_pos)
 
             # If the waypoint is the best we've seen so far, record it.
             if waypoint_dist < nearest_waypoint_dist:
@@ -227,52 +224,61 @@ class AStarPathPlanner:
                 nearest_waypoint_dist = waypoint_dist
 
             # Stop if we reach an essential waypoint.
-            if path_aux[i].item():
+            if path[i].is_essential:
                 break
 
         print(f"Distance to nearest waypoint: {nearest_waypoint_dist}")
 
         # TODO
-        nearest_waypoint_pos: np.ndarray = path[nearest_waypoint, :]
+        nearest_waypoint_pos: np.ndarray = path[nearest_waypoint].position
         if nearest_waypoint_dist <= 0.2:
             # If we're within striking distance of the nearest waypoint, prune up to and including it.
-            path = np.vstack([path[0, :], path[nearest_waypoint+1:, :]])
-            path_aux = np.vstack([path_aux[0, :], path_aux[nearest_waypoint + 1:, :]])
+            # TODO: Make this pruning into a method of Path.
+            path = Path(
+                np.vstack([path.positions[0], path.positions[nearest_waypoint+1:]]),
+                np.vstack([path.essential_flags[0], path.essential_flags[nearest_waypoint+1:]])
+            )
         else:
             # If there's a direct line of sight to the nearest waypoint, prune the intermediate waypoints.
             # TODO: Make a pos_to_vpos function.
             current_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(current_pos))
             nearest_waypoint_vpos: np.ndarray = self.__toolkit.node_to_vpos(self.__toolkit.pos_to_node(nearest_waypoint_pos))
             if self.__toolkit.line_segment_is_traversable(current_vpos, nearest_waypoint_vpos, use_clearance=True):
-                path = np.vstack([path[0, :], path[nearest_waypoint:, :]])
-                path_aux = np.vstack([path_aux[0, :], path_aux[nearest_waypoint:, :]])
+                # TODO: Make this pruning into a method of Path.
+                path = Path(
+                    np.vstack([path.positions[0], path.positions[nearest_waypoint:]]),
+                    np.vstack([path.essential_flags[0], path.essential_flags[nearest_waypoint:]])
+                )
 
         if len(path) == 1:
-            return None, None
+            return None
         else:
-            minipath, minipath_aux = self.plan_path(
-                current_pos, path[1, :], d=d, h=h,
+            minipath: Optional[Path] = self.plan_path(
+                current_pos, path[1].position, d=d, h=h,
                 allow_shortcuts=allow_shortcuts,
                 pull_strings=pull_strings,
                 use_clearance=use_clearance
             )
 
             if minipath is not None:
-                updated_path: np.ndarray = np.vstack([minipath[:-1], path[1:, :]])
-                updated_path_aux: np.ndarray = np.vstack([minipath_aux[:-1], path_aux[1:, :]])
-                # TODO: Only pull strings and use clearance if requested.
-                return self.__toolkit.pull_strings(updated_path, updated_path_aux, use_clearance=True)
+                # TODO: Make this splicing into a method of Path.
+                updated_path: Path = Path(
+                    np.vstack([minipath.positions[:-1], path.positions[1:]]),
+                    np.vstack([minipath.essential_flags[:-1], path.essential_flags[1:]])
+                )
+                # TODO: Only pull strings if requested.
+                return self.__toolkit.pull_strings(updated_path, use_clearance=use_clearance)
             else:
-                return None, None
+                return None
 
     # PRIVATE METHODS
 
-    def __finalise_path(self, path: Deque[np.ndarray], source: np.ndarray, goal: np.ndarray, *,
-                        pull_strings: bool, use_clearance: bool) -> Tuple[np.ndarray, np.ndarray]:
+    def __finalise_path(self, positions: Deque[np.ndarray], source: np.ndarray, goal: np.ndarray, *,
+                        pull_strings: bool, use_clearance: bool) -> Path:
         """
         Finalise a reconstructed path by adding the source and goal to it, and optionally performing string pulling.
 
-        :param path:            The path to finalise.
+        :param positions:       The 3D positions of the nodes on the path.
         :param source:          The source (a 3D point in space).
         :param goal:            The goal (a 3D point in space).
         :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
@@ -280,23 +286,21 @@ class AStarPathPlanner:
         :return:                The finalised path.
         """
         # Respectively prepend and append the true source and goal to the path.
-        path.appendleft(source)
-        path.append(goal)
+        positions.appendleft(source)
+        positions.append(goal)
 
-        # Convert the path into a numpy array of size n*3.
-        stacked_path: np.ndarray = np.vstack(path)
+        # Make the "essential flags" for the path, namely a flag for each node indicating whether or not the node
+        # is an essential part of the path (or can be smoothed away). For a simple path, the source and goal are
+        # essential, but the waypoints in between aren't.
+        essential_flags: np.ndarray = np.zeros((len(positions), 1), dtype=bool)
+        essential_flags[0] = essential_flags[-1] = True
 
-        # Make the auxiliary data for the path. This currently consists of a flag for each node indicating whether
-        # or not the node is an essential part of the path (or can be smoothed away). For a simple path, the source
-        # and goal are essential, but the waypoints in between aren't.
-        stacked_path_aux: np.ndarray = np.zeros((len(path), 1), dtype=bool)
-        stacked_path_aux[0] = stacked_path_aux[-1] = True
-
-        # Return the path, performing string pulling in the process if requested.
+        # Construct and return the finalised path, performing string pulling in the process if requested.
+        path: Path = Path(np.vstack(positions), essential_flags)
         if pull_strings:
-            return self.__toolkit.pull_strings(stacked_path, stacked_path_aux, use_clearance=use_clearance)
+            return self.__toolkit.pull_strings(path, use_clearance=use_clearance)
         else:
-            return stacked_path, stacked_path_aux
+            return path
 
     def __reconstruct_path(self, goal_node: PathNode, came_from: Dict[PathNode, Optional[PathNode]]) \
             -> Deque[np.ndarray]:

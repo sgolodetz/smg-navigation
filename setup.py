@@ -15,6 +15,7 @@ setuptools.setup(
     packages=["smg.navigation"],
     include_package_data=True,
     install_requires=[
+        "smg-opengl",
         "smg-pyoctomap"
     ],
     classifiers=[
