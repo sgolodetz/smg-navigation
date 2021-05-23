@@ -188,21 +188,30 @@ class AStarPathPlanner:
         # If the search has failed, return None.
         return None
 
-    def update_path(self, current_pos: np.ndarray, path: Path, *,
+    def update_path(self, current_pos: np.ndarray, path: Path, *, debug: bool = False,
                     d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                     h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                    allow_shortcuts: bool, pull_strings: bool, use_clearance: bool) -> Optional[Path]:
+                    allow_shortcuts: bool, pull_strings: bool, use_clearance: bool,
+                    nearest_waypoint_tolerance: float = 0.2) -> Optional[Path]:
         """
         Try to update the specified path based on the agent's current position.
 
-        :param current_pos:     The current position of the agent.
-        :param path:            The path to update.
-        :param d:               An optional distance function (if None, L1 distance will be used).
-        :param h:               An optional heuristic function (if None, L1 distance will be used).
-        :param allow_shortcuts: Whether or not to allow shortcutting when the goal is in sight.
-        :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
-        :param use_clearance:   Whether or not to take "clearance" around the path into account when updating it.
-        :return:                The updated path, if successful, or None otherwise.
+        .. note::
+            Although nothing in this module specifically refers to the measurement units being used, we generally
+            measure distances in metres throughout our code-base. The default tolerance is set with this in mind,
+            i.e. 0.2 is intended to indicate a 20cm tolerance around the nearest waypoint.
+
+        :param current_pos:                 The current position of the agent.
+        :param path:                        The path to update.
+        :param debug:                       Whether to print out debugging information.
+        :param d:                           An optional distance function (if None, L1 distance will be used).
+        :param h:                           An optional heuristic function (if None, L1 distance will be used).
+        :param allow_shortcuts:             Whether to allow shortcutting when the goal is in sight.
+        :param pull_strings:                Whether to perform string pulling on the path prior to returning it.
+        :param use_clearance:               Whether to take "clearance" around the path into account when updating it.
+        :param nearest_waypoint_tolerance:  The maximum distance to the nearest waypoint for the agent to be
+                                            considered within range of it.
+        :return:                            The updated path, if successful, or None otherwise.
         """
         # Find the nearest waypoint of those on the path up to and including the next essential one.
         nearest_waypoint_idx: int = -1
@@ -222,10 +231,12 @@ class AStarPathPlanner:
             if path[i].is_essential:
                 break
 
-        print(f"Distance to nearest waypoint: {nearest_waypoint_dist}")
+        # If we're debugging, print out the distance to the nearest waypoint.
+        if debug:
+            print(f"Distance to nearest waypoint: {nearest_waypoint_dist}")
 
         # If we're within striking distance of the nearest waypoint:
-        if nearest_waypoint_dist <= 0.2:
+        if nearest_waypoint_dist <= nearest_waypoint_tolerance:
             # Straighten the path up to and including its successor (if any). Note that if the nearest waypoint
             # is the goal, then the path will be left with only a single waypoint.
             path = path.straighten_before(nearest_waypoint_idx + 1)
@@ -233,7 +244,9 @@ class AStarPathPlanner:
             # Otherwise, if there's a direct line of sight to the nearest waypoint:
             current_vpos: np.ndarray = self.__toolkit.pos_to_vpos(current_pos)
             nearest_waypoint_vpos: np.ndarray = self.__toolkit.pos_to_vpos(path[nearest_waypoint_idx].position)
-            if self.__toolkit.line_segment_is_traversable(current_vpos, nearest_waypoint_vpos, use_clearance=True):
+            if self.__toolkit.line_segment_is_traversable(
+                current_vpos, nearest_waypoint_vpos, use_clearance=use_clearance
+            ):
                 # Straighten the path up to and including the nearest waypoint.
                 path = path.straighten_before(nearest_waypoint_idx)
 
