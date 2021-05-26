@@ -5,6 +5,7 @@ from typing import Callable, Deque, Dict, List, Optional
 
 from smg.utility import PriorityQueue
 
+from .path import Path
 from .planning_toolkit import EOccupancyStatus, PathNode, PlanningToolkit
 
 
@@ -25,13 +26,13 @@ class AStarPathPlanner:
 
     # PUBLIC METHODS
 
-    def plan_multipath(self, waypoints: List[np.ndarray],
-                       d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                       h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                       allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True) \
-            -> Optional[np.ndarray]:
+    def plan_multi_step_path(self, waypoints: List[np.ndarray],
+                             d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                             h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                             allow_shortcuts: bool = True, pull_strings: bool = True,
+                             use_clearance: bool = True) -> Optional[Path]:
         """
-        Try to plan a path that visits the specified set of waypoints.
+        Try to plan a path that visits the specified list of waypoints.
 
         .. note::
             See PlanningToolkit.node_is_traversable for the definition of what "clearance" means in this case.
@@ -44,14 +45,15 @@ class AStarPathPlanner:
         :param use_clearance:   Whether or not to plan a path that has sufficient "clearance" around it.
         :return:                The path, if one was successfully found, or None otherwise.
         """
-        multipath: List[np.ndarray] = []
+        multipath_positions: List[np.ndarray] = []
+        multipath_essential_flags: List[np.ndarray] = []
 
         # For each successive pair of waypoints:
         for i in range(len(waypoints) - 1):
             j: int = i + 1
 
-            # Try to plan an individual path between them.
-            path: Optional[np.ndarray] = self.plan_path(
+            # Try to plan a path between them.
+            path: Optional[Path] = self.plan_single_step_path(
                 waypoints[i], waypoints[j], d=d, h=h,
                 allow_shortcuts=allow_shortcuts,
                 pull_strings=pull_strings,
@@ -65,17 +67,19 @@ class AStarPathPlanner:
                 return None
             else:
                 if j == len(waypoints) - 1:
-                    multipath.append(path)
+                    multipath_positions.append(path.positions)
+                    multipath_essential_flags.append(path.essential_flags)
                 else:
-                    multipath.append(path[:-1])
+                    multipath_positions.append(path.positions[:-1])
+                    multipath_essential_flags.append(path.essential_flags[:-1])
 
-        return np.vstack(multipath)
+        return Path(np.vstack(multipath_positions), np.vstack(multipath_essential_flags))
 
-    def plan_path(self, source: np.ndarray, goal: np.ndarray, *,
-                  d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                  h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                  allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True) \
-            -> Optional[np.ndarray]:
+    def plan_single_step_path(self, source: np.ndarray, goal: np.ndarray, *,
+                              d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                              h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                              allow_shortcuts: bool = True, pull_strings: bool = True,
+                              use_clearance: bool = True) -> Optional[Path]:
         """
         Try to plan a path from the specified source to the specified goal.
 
@@ -184,14 +188,101 @@ class AStarPathPlanner:
         # If the search has failed, return None.
         return None
 
+    def update_path(self, current_pos: np.ndarray, path: Path, *, debug: bool = False,
+                    d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                    h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
+                    allow_shortcuts: bool, pull_strings: bool, use_clearance: bool,
+                    nearest_waypoint_tolerance: float = 0.2) -> Optional[Path]:
+        """
+        Try to update the specified path based on the agent's current position.
+
+        .. note::
+            Although nothing in this module specifically refers to the measurement units being used, we generally
+            measure distances in metres throughout our code-base. The default tolerance is set with this in mind,
+            i.e. 0.2 is intended to indicate a 20cm tolerance around the nearest waypoint.
+
+        :param current_pos:                 The current position of the agent.
+        :param path:                        The path to update.
+        :param debug:                       Whether to print out debugging information.
+        :param d:                           An optional distance function (if None, L1 distance will be used).
+        :param h:                           An optional heuristic function (if None, L1 distance will be used).
+        :param allow_shortcuts:             Whether to allow shortcutting when the goal is in sight.
+        :param pull_strings:                Whether to perform string pulling on the path prior to returning it.
+        :param use_clearance:               Whether to take "clearance" around the path into account when updating it.
+        :param nearest_waypoint_tolerance:  The maximum distance to the nearest waypoint for the agent to be
+                                            considered within range of it.
+        :return:                            The updated path, if successful, or None otherwise.
+        """
+        # Find the nearest waypoint of those on the path up to and including the next essential one.
+        nearest_waypoint_idx: int = -1
+        nearest_waypoint_dist: float = np.inf
+
+        # For each waypoint beyond the agent's current position:
+        for i in range(1, len(path)):
+            # Find the distance between the agent and the waypoint.
+            waypoint_dist: float = np.linalg.norm(path[i].position - current_pos)
+
+            # If the waypoint is the best we've seen so far, record it.
+            if waypoint_dist < nearest_waypoint_dist:
+                nearest_waypoint_idx = i
+                nearest_waypoint_dist = waypoint_dist
+
+            # Stop if we reach an essential waypoint.
+            if path[i].is_essential:
+                break
+
+        # If we're debugging, print out the distance to the nearest waypoint.
+        if debug:
+            print(f"Distance to nearest waypoint: {nearest_waypoint_dist}")
+
+        # If we're within striking distance of the nearest waypoint:
+        if nearest_waypoint_dist <= nearest_waypoint_tolerance:
+            # Straighten the path up to and including its successor (if any). Note that if the nearest waypoint
+            # is the goal, then the path will be left with only a single waypoint.
+            path = path.straighten_before(nearest_waypoint_idx + 1)
+        else:
+            # Otherwise, if there's a direct line of sight to the nearest waypoint:
+            current_vpos: np.ndarray = self.__toolkit.pos_to_vpos(current_pos)
+            nearest_waypoint_vpos: np.ndarray = self.__toolkit.pos_to_vpos(path[nearest_waypoint_idx].position)
+            if self.__toolkit.line_segment_is_traversable(
+                current_vpos, nearest_waypoint_vpos, use_clearance=use_clearance
+            ):
+                # Straighten the path up to and including the nearest waypoint.
+                path = path.straighten_before(nearest_waypoint_idx)
+
+        # If the path now has only a single waypoint:
+        if len(path) == 1:
+            # We've reached the goal, so there's no need for a path any more.
+            return None
+        else:
+            # Otherwise, try to plan a new sub-path from the current position to the next waypoint.
+            new_subpath: Optional[Path] = self.plan_single_step_path(
+                current_pos, path[1].position, d=d, h=h,
+                allow_shortcuts=allow_shortcuts, pull_strings=pull_strings, use_clearance=use_clearance
+            )
+
+            # If that succeeded:
+            if new_subpath is not None:
+                # Replace the existing sub-path to the next waypoint with the new one.
+                updated_path: Path = path.replace_before(1, new_subpath)
+
+                # Return the updated path, performing string pulling in the process if requested.
+                if pull_strings:
+                    return self.__toolkit.pull_strings(updated_path, use_clearance=use_clearance)
+                else:
+                    return updated_path
+            else:
+                # If a new sub-path couldn't be found, the path update has failed, so return None.
+                return None
+
     # PRIVATE METHODS
 
-    def __finalise_path(self, path: Deque[np.ndarray], source: np.ndarray, goal: np.ndarray, *,
-                        pull_strings: bool, use_clearance: bool) -> np.ndarray:
+    def __finalise_path(self, positions: Deque[np.ndarray], source: np.ndarray, goal: np.ndarray, *,
+                        pull_strings: bool, use_clearance: bool) -> Path:
         """
         Finalise a reconstructed path by adding the source and goal to it, and optionally performing string pulling.
 
-        :param path:            The path to finalise.
+        :param positions:       The 3D positions of the path's waypoints.
         :param source:          The source (a 3D point in space).
         :param goal:            The goal (a 3D point in space).
         :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
@@ -199,14 +290,21 @@ class AStarPathPlanner:
         :return:                The finalised path.
         """
         # Respectively prepend and append the true source and goal to the path.
-        path.appendleft(source)
-        path.append(goal)
+        positions.appendleft(source)
+        positions.append(goal)
 
-        # Return the path, performing string pulling in the process if requested.
+        # Make the "essential flags" for the path, namely a flag for each waypoint indicating whether or not the
+        # waypoint is an essential part of the path (or can be smoothed away). For a simple path, the source and
+        # goal are essential, but the waypoints in between aren't.
+        essential_flags: np.ndarray = np.zeros((len(positions), 1), dtype=bool)
+        essential_flags[0] = essential_flags[-1] = True
+
+        # Construct and return the finalised path, performing string pulling in the process if requested.
+        path: Path = Path(np.vstack(positions), essential_flags)
         if pull_strings:
-            return self.__toolkit.pull_strings(np.vstack(path), use_clearance=use_clearance)
+            return self.__toolkit.pull_strings(path, use_clearance=use_clearance)
         else:
-            return np.vstack(path)
+            return path
 
     def __reconstruct_path(self, goal_node: PathNode, came_from: Dict[PathNode, Optional[PathNode]]) \
             -> Deque[np.ndarray]:
