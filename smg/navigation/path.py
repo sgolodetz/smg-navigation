@@ -105,6 +105,10 @@ class Path:
 
     # PUBLIC METHODS
 
+    def copy(self) -> Path:
+        """Make a copy of the path."""
+        return Path(self.__positions, self.__essential_flags)
+
     def interpolate(self, *, new_length: int = 100) -> Path:
         """
         Make a smoother version of the path by using curve fitting and interpolation.
