@@ -123,10 +123,10 @@ class AStarPathPlanner:
 
         # Check that the source and goal are traversable to avoid costly searching for a path that can't exist.
         # Early out if either is not traversable.
-        if not self.__toolkit.node_is_traversable(source_node, use_clearance=use_clearance):
-            if self.__debug:
-                print("Source is not traversable")
-            return None
+        # if not self.__toolkit.node_is_traversable(source_node, use_clearance=use_clearance):
+        #     if self.__debug:
+        #         print("Source is not traversable")
+        #     return None
 
         if not self.__toolkit.node_is_traversable(goal_node, use_clearance=use_clearance):
             if self.__debug:
