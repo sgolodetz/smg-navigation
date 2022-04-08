@@ -73,7 +73,13 @@ class AStarPathPlanner:
                     multipath_positions.append(path.positions[:-1])
                     multipath_essential_flags.append(path.essential_flags[:-1])
 
-        return Path(np.vstack(multipath_positions), np.vstack(multipath_essential_flags))
+        # TODO: Comment here.
+        if len(multipath_positions) > 0 and len(multipath_essential_flags) > 0:
+            return Path(np.vstack(multipath_positions), np.vstack(multipath_essential_flags))
+
+        # TODO: Comment here.
+        else:
+            return None
 
     def plan_single_step_path(self, source: np.ndarray, goal: np.ndarray, *,
                               d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
