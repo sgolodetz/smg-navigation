@@ -204,8 +204,7 @@ class AStarPathPlanner:
 
         .. note::
             Although nothing in this module specifically refers to the measurement units being used, we generally
-            measure distances in metres throughout our code-base. The default tolerance is set with this in mind,
-            i.e. 0.2 is intended to indicate a 20cm tolerance around the nearest waypoint.
+            measure distances in metres throughout our code-base.
 
         :param current_pos:                 The current position of the agent.
         :param path:                        The path to update.
@@ -250,46 +249,16 @@ class AStarPathPlanner:
             if len(path) == 1:
                 return None
 
-        # Otherwise:
-        else:
-            # If there's a direct line of sight to the nearest waypoint:
-            current_vpos: np.ndarray = self.__toolkit.pos_to_vpos(current_pos)
-            nearest_waypoint_vpos: np.ndarray = self.__toolkit.pos_to_vpos(path[nearest_waypoint_idx].position)
-            if self.__toolkit.line_segment_is_traversable(
-                current_vpos, nearest_waypoint_vpos, use_clearance=use_clearance
-            ):
-                # Straighten the path up to and including the nearest waypoint.
-                path = path.straighten_before(nearest_waypoint_idx)
-
-        # # TODO
-        # closest_point: np.ndarray = GeometryUtil.find_closest_point_on_line_segment(
-        #     current_pos, path.positions[0], path.positions[1]
-        # )
-        # # ###
-        # # # TODO
-        # new_subpath: Optional[Path] = self.plan_single_step_path(
-        #     current_pos, closest_point, d=d, h=h,
-        #     allow_shortcuts=allow_shortcuts, pull_strings=pull_strings, use_clearance=use_clearance
-        # )
-        # # # TODO
-        # if new_subpath is not None:
-        #     # TODO
-        #     # print("===")
-        #     # print(self.__toolkit.chord_is_traversable(new_subpath, 0, len(new_subpath) - 1, use_clearance=True))
-        #     # print(self.__toolkit.chord_is_traversable(new_subpath, 0, len(new_subpath) - 1, use_clearance=True))
-        #     path = path.replace_before(1, new_subpath, keep_last=True)
-        # #     print(len(path))
-        # #     path = path.replace_before(0, new_subpath)
-        # #     print(len(path))
-        # #
-        #     # Return the updated path, performing string pulling in the process if requested.
-        #     if pull_strings:
-        #         return self.__toolkit.pull_strings(path, use_clearance=use_clearance)
-        #     else:
-        #         return path
+        # # Otherwise:
         # else:
-        #     # TODO
-        #     return None
+        #     # If there's a direct line of sight to the nearest waypoint:
+        #     current_vpos: np.ndarray = self.__toolkit.pos_to_vpos(current_pos)
+        #     nearest_waypoint_vpos: np.ndarray = self.__toolkit.pos_to_vpos(path[nearest_waypoint_idx].position)
+        #     if self.__toolkit.line_segment_is_traversable(
+        #         current_vpos, nearest_waypoint_vpos, use_clearance=use_clearance
+        #     ):
+        #         # Straighten the path up to and including the nearest waypoint.
+        #         path = path.straighten_before(nearest_waypoint_idx)
 
         # Try to plan a new sub-path from the current position to the next waypoint.
         new_subpath: Optional[Path] = self.plan_single_step_path(
@@ -310,51 +279,6 @@ class AStarPathPlanner:
         else:
             # If a new sub-path couldn't be found, the path update has failed, so return None.
             return None
-
-        ###
-        # closest_distance: float = np.linalg.norm(current_pos - closest_point)
-        # if closest_distance > 0.2:  # FIXME
-        #     new_subpath: Optional[Path] = self.plan_single_step_path(
-        #         current_pos, closest_point, d=d, h=h,
-        #         allow_shortcuts=True, pull_strings=True, use_clearance=True
-        #     )
-        #     path = path.replace_before(1, new_subpath)
-        # else:
-        #     path.positions[0] = closest_point
-
-        #     # Otherwise, if there's a direct line of sight to the nearest waypoint:
-        #     current_vpos: np.ndarray = self.__toolkit.pos_to_vpos(current_pos)
-        #     nearest_waypoint_vpos: np.ndarray = self.__toolkit.pos_to_vpos(path[nearest_waypoint_idx].position)
-        #     if self.__toolkit.line_segment_is_traversable(
-        #         current_vpos, nearest_waypoint_vpos, use_clearance=use_clearance
-        #     ):
-        #         # Straighten the path up to and including the nearest waypoint.
-        #         path = path.straighten_before(nearest_waypoint_idx)
-        #
-        # # If the path now has only a single waypoint:
-        # if len(path) == 1:
-        #     # We've reached the goal, so there's no need for a path any more.
-        #     return None
-        # else:
-        #     # Otherwise, try to plan a new sub-path from the current position to the next waypoint.
-        #     new_subpath: Optional[Path] = self.plan_single_step_path(
-        #         current_pos, path[1].position, d=d, h=h,
-        #         allow_shortcuts=allow_shortcuts, pull_strings=pull_strings, use_clearance=use_clearance
-        #     )
-        #
-        #     # If that succeeded:
-        #     if new_subpath is not None:
-        #         # Replace the existing sub-path to the next waypoint with the new one.
-        #         updated_path: Path = path.replace_before(1, new_subpath)
-        #
-        #         # Return the updated path, performing string pulling in the process if requested.
-        #         if pull_strings:
-        #             return self.__toolkit.pull_strings(updated_path, use_clearance=use_clearance)
-        #         else:
-        #             return updated_path
-        #     else:
-        #         # If a new sub-path couldn't be found, the path update has failed, so return None.
-        #         return None
 
     # PRIVATE METHODS
 
