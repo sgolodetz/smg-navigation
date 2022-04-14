@@ -3,7 +3,7 @@ import numpy as np
 from collections import defaultdict, deque
 from typing import Callable, Deque, Dict, List, Optional
 
-from smg.utility import PriorityQueue
+from smg.utility import GeometryUtil, PriorityQueue
 
 from .path import Path
 from .planning_toolkit import EOccupancyStatus, PathNode, PlanningToolkit
@@ -198,7 +198,7 @@ class AStarPathPlanner:
                     d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                     h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                     allow_shortcuts: bool, pull_strings: bool, use_clearance: bool,
-                    nearest_waypoint_tolerance: float = 0.2) -> Optional[Path]:
+                    nearest_waypoint_tolerance: float) -> Optional[Path]:
         """
         Try to update the specified path based on the agent's current position.
 
@@ -243,11 +243,16 @@ class AStarPathPlanner:
 
         # If we're within striking distance of the nearest waypoint:
         if nearest_waypoint_dist <= nearest_waypoint_tolerance:
-            # Straighten the path up to and including its successor (if any). Note that if the nearest waypoint
-            # is the goal, then the path will be left with only a single waypoint.
+            # Straighten the path up to and including its successor (if any). Note that iff the nearest waypoint
+            # is the goal, then this will leave the path with only a single waypoint (which is invalid). If that
+            # happens, there's no need for a path any more, and we simply early out.
             path = path.straighten_before(nearest_waypoint_idx + 1)
+            if len(path) == 1:
+                return None
+
+        # Otherwise:
         else:
-            # Otherwise, if there's a direct line of sight to the nearest waypoint:
+            # If there's a direct line of sight to the nearest waypoint:
             current_vpos: np.ndarray = self.__toolkit.pos_to_vpos(current_pos)
             nearest_waypoint_vpos: np.ndarray = self.__toolkit.pos_to_vpos(path[nearest_waypoint_idx].position)
             if self.__toolkit.line_segment_is_traversable(
@@ -256,30 +261,100 @@ class AStarPathPlanner:
                 # Straighten the path up to and including the nearest waypoint.
                 path = path.straighten_before(nearest_waypoint_idx)
 
-        # If the path now has only a single waypoint:
-        if len(path) == 1:
-            # We've reached the goal, so there's no need for a path any more.
-            return None
-        else:
-            # Otherwise, try to plan a new sub-path from the current position to the next waypoint.
-            new_subpath: Optional[Path] = self.plan_single_step_path(
-                current_pos, path[1].position, d=d, h=h,
-                allow_shortcuts=allow_shortcuts, pull_strings=pull_strings, use_clearance=use_clearance
-            )
+        # # TODO
+        # closest_point: np.ndarray = GeometryUtil.find_closest_point_on_line_segment(
+        #     current_pos, path.positions[0], path.positions[1]
+        # )
+        # # ###
+        # # # TODO
+        # new_subpath: Optional[Path] = self.plan_single_step_path(
+        #     current_pos, closest_point, d=d, h=h,
+        #     allow_shortcuts=allow_shortcuts, pull_strings=pull_strings, use_clearance=use_clearance
+        # )
+        # # # TODO
+        # if new_subpath is not None:
+        #     # TODO
+        #     # print("===")
+        #     # print(self.__toolkit.chord_is_traversable(new_subpath, 0, len(new_subpath) - 1, use_clearance=True))
+        #     # print(self.__toolkit.chord_is_traversable(new_subpath, 0, len(new_subpath) - 1, use_clearance=True))
+        #     path = path.replace_before(1, new_subpath, keep_last=True)
+        # #     print(len(path))
+        # #     path = path.replace_before(0, new_subpath)
+        # #     print(len(path))
+        # #
+        #     # Return the updated path, performing string pulling in the process if requested.
+        #     if pull_strings:
+        #         return self.__toolkit.pull_strings(path, use_clearance=use_clearance)
+        #     else:
+        #         return path
+        # else:
+        #     # TODO
+        #     return None
 
-            # If that succeeded:
-            if new_subpath is not None:
-                # Replace the existing sub-path to the next waypoint with the new one.
-                updated_path: Path = path.replace_before(1, new_subpath)
+        # Try to plan a new sub-path from the current position to the next waypoint.
+        new_subpath: Optional[Path] = self.plan_single_step_path(
+            current_pos, path[1].position, d=d, h=h,
+            allow_shortcuts=allow_shortcuts, pull_strings=pull_strings, use_clearance=use_clearance
+        )
 
-                # Return the updated path, performing string pulling in the process if requested.
-                if pull_strings:
-                    return self.__toolkit.pull_strings(updated_path, use_clearance=use_clearance)
-                else:
-                    return updated_path
+        # If that succeeded:
+        if new_subpath is not None:
+            # Replace the existing sub-path to the next waypoint with the new one.
+            updated_path: Path = path.replace_before(1, new_subpath, keep_last=False)
+
+            # Return the updated path, performing string pulling in the process if requested.
+            if pull_strings:
+                return self.__toolkit.pull_strings(updated_path, use_clearance=use_clearance)
             else:
-                # If a new sub-path couldn't be found, the path update has failed, so return None.
-                return None
+                return updated_path
+        else:
+            # If a new sub-path couldn't be found, the path update has failed, so return None.
+            return None
+
+        ###
+        # closest_distance: float = np.linalg.norm(current_pos - closest_point)
+        # if closest_distance > 0.2:  # FIXME
+        #     new_subpath: Optional[Path] = self.plan_single_step_path(
+        #         current_pos, closest_point, d=d, h=h,
+        #         allow_shortcuts=True, pull_strings=True, use_clearance=True
+        #     )
+        #     path = path.replace_before(1, new_subpath)
+        # else:
+        #     path.positions[0] = closest_point
+
+        #     # Otherwise, if there's a direct line of sight to the nearest waypoint:
+        #     current_vpos: np.ndarray = self.__toolkit.pos_to_vpos(current_pos)
+        #     nearest_waypoint_vpos: np.ndarray = self.__toolkit.pos_to_vpos(path[nearest_waypoint_idx].position)
+        #     if self.__toolkit.line_segment_is_traversable(
+        #         current_vpos, nearest_waypoint_vpos, use_clearance=use_clearance
+        #     ):
+        #         # Straighten the path up to and including the nearest waypoint.
+        #         path = path.straighten_before(nearest_waypoint_idx)
+        #
+        # # If the path now has only a single waypoint:
+        # if len(path) == 1:
+        #     # We've reached the goal, so there's no need for a path any more.
+        #     return None
+        # else:
+        #     # Otherwise, try to plan a new sub-path from the current position to the next waypoint.
+        #     new_subpath: Optional[Path] = self.plan_single_step_path(
+        #         current_pos, path[1].position, d=d, h=h,
+        #         allow_shortcuts=allow_shortcuts, pull_strings=pull_strings, use_clearance=use_clearance
+        #     )
+        #
+        #     # If that succeeded:
+        #     if new_subpath is not None:
+        #         # Replace the existing sub-path to the next waypoint with the new one.
+        #         updated_path: Path = path.replace_before(1, new_subpath)
+        #
+        #         # Return the updated path, performing string pulling in the process if requested.
+        #         if pull_strings:
+        #             return self.__toolkit.pull_strings(updated_path, use_clearance=use_clearance)
+        #         else:
+        #             return updated_path
+        #     else:
+        #         # If a new sub-path couldn't be found, the path update has failed, so return None.
+        #         return None
 
     # PRIVATE METHODS
 
