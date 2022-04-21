@@ -111,7 +111,7 @@ class Path:
 
     def copy(self) -> Path:
         """Make a copy of the path."""
-        return Path(self.__positions, self.__essential_flags)
+        return Path(self.__positions.copy(), self.__essential_flags.copy())
 
     def interpolate(self, *, new_length: int = 100) -> Path:
         """
