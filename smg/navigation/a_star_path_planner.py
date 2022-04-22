@@ -198,7 +198,7 @@ class AStarPathPlanner:
                     d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                     h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                     allow_shortcuts: bool, pull_strings: bool, use_clearance: bool,
-                    nearest_waypoint_tolerance: float) -> Optional[Path]:
+                    waypoint_capture_range: float) -> Optional[Path]:
         """
         Try to update the specified path based on the agent's current position.
 
@@ -214,8 +214,8 @@ class AStarPathPlanner:
         :param allow_shortcuts:             Whether to allow shortcutting when the goal is in sight.
         :param pull_strings:                Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:               Whether to take "clearance" around the path into account when updating it.
-        :param nearest_waypoint_tolerance:  The maximum distance to the nearest waypoint for the agent to be
-                                            considered within range of it.
+        :param waypoint_capture_range:      The maximum distance to a waypoint for the agent to be considered within
+                                            range of it.
         :return:                            The updated path, if successful, or None otherwise.
         """
         # Find the nearest waypoint of those on the path up to and including the next essential one.
@@ -240,8 +240,8 @@ class AStarPathPlanner:
         if debug:
             print(f"Distance to nearest waypoint: {nearest_waypoint_dist}")
 
-        # If we're within striking distance of the nearest waypoint:
-        if nearest_waypoint_dist <= nearest_waypoint_tolerance:
+        # If we're within the capture range of the nearest waypoint:
+        if nearest_waypoint_dist <= waypoint_capture_range:
             # Straighten the path up to and including its successor (if any). Note that iff the nearest waypoint
             # is the goal, then this will leave the path with only a single waypoint (which is invalid). If that
             # happens, there's no need for a path any more, and we simply early out.
