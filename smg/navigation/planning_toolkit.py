@@ -227,6 +227,14 @@ class PlanningToolkit:
         dest_vpos: np.ndarray = self.node_to_vpos(dest_node)
         return self.line_segment_is_traversable(source_vpos, dest_vpos, use_clearance=use_clearance)
 
+    def get_tree(self) -> OcTree:
+        """
+        Get the Octomap octree associated with the toolkit.
+
+        :return:    The Octomap octree associated with the toolkit.
+        """
+        return self.__tree
+
     def line_segment_is_traversable(self, source_vpos: np.ndarray, dest_vpos: np.ndarray, *,
                                     use_clearance: bool) -> bool:
         """
@@ -324,6 +332,15 @@ class PlanningToolkit:
         else:
             occupied: bool = self.__tree.is_node_occupied(octree_node)
             return OCS_OCCUPIED if occupied else OCS_FREE
+
+    def point_is_in_bounds(self, pos: np.ndarray) -> bool:
+        """
+        Check whether the specified position is within the bounds of the Octomap octree.
+
+        :param pos: The position.
+        :return:    True, if the position is within the Octomap octree bounds, or False otherwise.
+        """
+        return self.__tree.is_point_in_bounds(Vector3(*pos))
 
     def pos_to_node(self, pos: np.ndarray) -> PathNode:
         """
