@@ -340,7 +340,7 @@ class PlanningToolkit:
         :param pos: The position.
         :return:    True, if the position is within the Octomap octree bounds, or False otherwise.
         """
-        return self.__tree.is_point_in_bounds(Vector3(*pos))
+        return self.__tree.is_in_bounds(Vector3(*pos))
 
     def pos_to_node(self, pos: np.ndarray) -> PathNode:
         """
