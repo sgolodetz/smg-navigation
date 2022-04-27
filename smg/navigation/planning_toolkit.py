@@ -259,7 +259,8 @@ class PlanningToolkit:
 
         return True
 
-    def node_is_traversable(self, node: PathNode, *, use_clearance: bool) -> bool:
+    def node_is_traversable(self, node: PathNode, *, neighbours: Optional[Callable[[PathNode], List[PathNode]]] = None,
+                            use_clearance: bool) -> bool:
         """
         Check whether the specified path node can be traversed.
 
@@ -270,14 +271,19 @@ class PlanningToolkit:
             its immediate neighbours.
 
         :param node:            The node whose traversability we want to check.
+        :param neighbours:      An optional function specifying how the neighbours of a path node are to be computed.
+                                If this is None, the default neighbours function for the toolkit will be used instead.
         :param use_clearance:   Whether to require there to be sufficient "clearance" around the node.
         :return:                True, if the node is traversable, or False otherwise.
         """
+        if neighbours is None:
+            neighbours = self.neighbours
+
         if not self.node_is_free(node):
             return False
 
         if use_clearance:
-            for neighbour_node in self.neighbours(node):
+            for neighbour_node in neighbours(node):
                 if not self.node_is_free(neighbour_node):
                     return False
 
