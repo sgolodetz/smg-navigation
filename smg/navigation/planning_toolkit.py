@@ -59,7 +59,7 @@ class PlanningToolkit:
         .. note::
             If the neighbours function isn't explicitly specified, 6-connected neighbours will be computed.
 
-        :param tree:            The Octomap octree over which paths are to be planned.
+        :param tree:            The octree over which paths are to be planned.
         :param neighbours:      An optional function specifying how the neighbours of a path node are to be computed.
         :param node_is_free:    An optional function specifying what counts as a "free" path node.
         """
@@ -226,6 +226,23 @@ class PlanningToolkit:
         dest_node: PathNode = self.pos_to_node(path[dest].position)
         dest_vpos: np.ndarray = self.node_to_vpos(dest_node)
         return self.line_segment_is_traversable(source_vpos, dest_vpos, use_clearance=use_clearance)
+
+    def get_tree(self) -> OcTree:
+        """
+        Get the octree associated with the toolkit.
+
+        :return:    The octree associated with the toolkit.
+        """
+        return self.__tree
+
+    def is_in_bounds(self, pos: np.ndarray) -> bool:
+        """
+        Check whether the specified position is within the bounds of the octree.
+
+        :param pos: The position.
+        :return:    True, if the position is within the octree bounds, or False otherwise.
+        """
+        return self.__tree.is_in_bounds(Vector3(*pos))
 
     def line_segment_is_traversable(self, source_vpos: np.ndarray, dest_vpos: np.ndarray, *,
                                     use_clearance: bool) -> bool:
