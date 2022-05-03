@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import threading
 
 from collections import defaultdict, deque
 from typing import Callable, Deque, Dict, List, Optional
@@ -30,8 +31,8 @@ class AStarPathPlanner:
     def plan_multi_step_path(self, waypoints: List[np.ndarray],
                              d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                              h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                             allow_shortcuts: bool = True, pull_strings: bool = True,
-                             use_clearance: bool = True) -> Optional[Path]:
+                             allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True,
+                             stop_planning: Optional[threading.Event] = None) -> Optional[Path]:
         """
         Try to plan a path that visits the specified list of waypoints.
 
@@ -44,6 +45,7 @@ class AStarPathPlanner:
         :param allow_shortcuts: Whether or not to allow shortcutting when the goal is in sight.
         :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:   Whether or not to plan a path that has sufficient "clearance" around it.
+        :param stop_planning:   An optional event that can be used to stop planning if needed.
         :return:                The path, if one was successfully found, or None otherwise.
         :raises RuntimeError:   If there are fewer than two waypoints.
         """
@@ -63,7 +65,8 @@ class AStarPathPlanner:
                 waypoints[i], waypoints[j], d=d, h=h,
                 allow_shortcuts=allow_shortcuts,
                 pull_strings=pull_strings,
-                use_clearance=use_clearance
+                use_clearance=use_clearance,
+                stop_planning=stop_planning
             )
 
             # If no path can be found between this pair of waypoints, early out. Otherwise, add this path to the
@@ -84,8 +87,8 @@ class AStarPathPlanner:
     def plan_single_step_path(self, source: np.ndarray, goal: np.ndarray, *,
                               d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                               h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                              allow_shortcuts: bool = True, pull_strings: bool = True,
-                              use_clearance: bool = True) -> Optional[Path]:
+                              allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True,
+                              stop_planning: Optional[threading.Event] = None) -> Optional[Path]:
         """
         Try to plan a path from the specified source to the specified goal.
 
@@ -99,6 +102,7 @@ class AStarPathPlanner:
         :param allow_shortcuts: Whether or not to allow shortcutting when the goal is in sight.
         :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:   Whether or not to plan a path that has sufficient "clearance" around it.
+        :param stop_planning:   An optional event that can be used to stop planning if needed.
         :return:                The path, if one was successfully found, or None otherwise.
         """
         # Loosely based on an amalgam of:
@@ -151,6 +155,17 @@ class AStarPathPlanner:
 
         # While the search still has a chance of succeeding:
         while not frontier.empty():
+            # If we're trying to stop planning, early out.
+            if stop_planning is not None and stop_planning.is_set():
+                break
+
+            # Every few iterations, pause for 1 millisecond to give other threads a chance.
+            if iterations_till_pause == 0:
+                time.sleep(0.001)
+                iterations_till_pause = 10
+            else:
+                iterations_till_pause -= 1
+
             # Get the current node to explore from the frontier.
             current_node: PathNode = frontier.top().ident
             current_vpos: np.ndarray = self.__toolkit.node_to_vpos(current_node)
@@ -192,13 +207,6 @@ class AStarPathPlanner:
                         frontier.update_key(neighbour_node, f_score)
                     else:
                         frontier.insert(neighbour_node, f_score, None)
-
-                # Every few iterations, pause for 1 millisecond to give other threads a chance.
-                if iterations_till_pause == 0:
-                    time.sleep(0.001)
-                    iterations_till_pause = 10
-                else:
-                    iterations_till_pause -= 1
 
         # If the search has failed, return None.
         return None
