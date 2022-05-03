@@ -147,7 +147,7 @@ class AStarPathPlanner:
         frontier: PriorityQueue[PathNode, float, type(None)] = PriorityQueue[PathNode, float, type(None)]()
         frontier.insert(source_node, h(source_vpos, goal_vpos), None)
 
-        iterations_till_pause: int = 0
+        iterations_till_pause: int = 10
 
         # While the search still has a chance of succeeding:
         while not frontier.empty():
