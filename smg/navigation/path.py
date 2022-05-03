@@ -58,10 +58,6 @@ class Path:
         :param positions:       The 3D positions of the path's waypoints.
         :param essential_flags: An array of flags indicating which waypoints are essential to the path.
         """
-        for i in range(len(positions)):
-            if np.isnan(positions[i]).any():
-                raise RuntimeError("Error: Paths should not contain NaNs")
-
         self.__positions: np.ndarray = positions
         self.__essential_flags: np.ndarray = essential_flags
 
