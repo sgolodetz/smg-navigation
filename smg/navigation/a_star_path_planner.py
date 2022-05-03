@@ -3,7 +3,7 @@ import numpy as np
 from collections import defaultdict, deque
 from typing import Callable, Deque, Dict, List, Optional
 
-from smg.utility import GeometryUtil, PriorityQueue
+from smg.utility import PriorityQueue
 
 from .path import Path
 from .planning_toolkit import EOccupancyStatus, PathNode, PlanningToolkit
@@ -44,7 +44,12 @@ class AStarPathPlanner:
         :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:   Whether or not to plan a path that has sufficient "clearance" around it.
         :return:                The path, if one was successfully found, or None otherwise.
+        :raises RuntimeError:   If there are fewer than two waypoints.
         """
+        # Raise an exception if there are fewer than two waypoints.
+        if len(waypoints) < 2:
+            raise RuntimeError("Error: Cannot plan a path for fewer than two waypoints")
+
         multipath_positions: List[np.ndarray] = []
         multipath_essential_flags: List[np.ndarray] = []
 
@@ -73,13 +78,7 @@ class AStarPathPlanner:
                     multipath_positions.append(path.positions[:-1])
                     multipath_essential_flags.append(path.essential_flags[:-1])
 
-        # TODO: Comment here.
-        if len(multipath_positions) > 0 and len(multipath_essential_flags) > 0:
-            return Path(np.vstack(multipath_positions), np.vstack(multipath_essential_flags))
-
-        # TODO: Comment here.
-        else:
-            return None
+        return Path(np.vstack(multipath_positions), np.vstack(multipath_essential_flags))
 
     def plan_single_step_path(self, source: np.ndarray, goal: np.ndarray, *,
                               d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
