@@ -248,17 +248,6 @@ class AStarPathPlanner:
             if len(path) == 1:
                 return None
 
-        # # Otherwise:
-        # else:
-        #     # If there's a direct line of sight to the nearest waypoint:
-        #     current_vpos: np.ndarray = self.__toolkit.pos_to_vpos(current_pos)
-        #     nearest_waypoint_vpos: np.ndarray = self.__toolkit.pos_to_vpos(path[nearest_waypoint_idx].position)
-        #     if self.__toolkit.line_segment_is_traversable(
-        #         current_vpos, nearest_waypoint_vpos, use_clearance=use_clearance
-        #     ):
-        #         # Straighten the path up to and including the nearest waypoint.
-        #         path = path.straighten_before(nearest_waypoint_idx)
-
         # Try to plan a new sub-path from the current position to the next waypoint.
         new_subpath: Optional[Path] = self.plan_single_step_path(
             current_pos, path[1].position, d=d, h=h,
