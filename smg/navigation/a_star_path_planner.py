@@ -1,4 +1,6 @@
 import numpy as np
+import time
+import threading
 
 from collections import defaultdict, deque
 from typing import Callable, Deque, Dict, List, Optional
@@ -29,8 +31,8 @@ class AStarPathPlanner:
     def plan_multi_step_path(self, waypoints: List[np.ndarray],
                              d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                              h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                             allow_shortcuts: bool = True, pull_strings: bool = True,
-                             use_clearance: bool = True) -> Optional[Path]:
+                             allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True,
+                             stop_planning: Optional[threading.Event] = None) -> Optional[Path]:
         """
         Try to plan a path that visits the specified list of waypoints.
 
@@ -43,8 +45,14 @@ class AStarPathPlanner:
         :param allow_shortcuts: Whether or not to allow shortcutting when the goal is in sight.
         :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:   Whether or not to plan a path that has sufficient "clearance" around it.
+        :param stop_planning:   An optional event that can be used to stop planning if needed.
         :return:                The path, if one was successfully found, or None otherwise.
+        :raises RuntimeError:   If there are fewer than two waypoints.
         """
+        # Raise an exception if there are fewer than two waypoints.
+        if len(waypoints) < 2:
+            raise RuntimeError("Error: Cannot plan a path for fewer than two waypoints")
+
         multipath_positions: List[np.ndarray] = []
         multipath_essential_flags: List[np.ndarray] = []
 
@@ -57,7 +65,8 @@ class AStarPathPlanner:
                 waypoints[i], waypoints[j], d=d, h=h,
                 allow_shortcuts=allow_shortcuts,
                 pull_strings=pull_strings,
-                use_clearance=use_clearance
+                use_clearance=use_clearance,
+                stop_planning=stop_planning
             )
 
             # If no path can be found between this pair of waypoints, early out. Otherwise, add this path to the
@@ -78,8 +87,8 @@ class AStarPathPlanner:
     def plan_single_step_path(self, source: np.ndarray, goal: np.ndarray, *,
                               d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                               h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
-                              allow_shortcuts: bool = True, pull_strings: bool = True,
-                              use_clearance: bool = True) -> Optional[Path]:
+                              allow_shortcuts: bool = True, pull_strings: bool = True, use_clearance: bool = True,
+                              stop_planning: Optional[threading.Event] = None) -> Optional[Path]:
         """
         Try to plan a path from the specified source to the specified goal.
 
@@ -93,6 +102,7 @@ class AStarPathPlanner:
         :param allow_shortcuts: Whether or not to allow shortcutting when the goal is in sight.
         :param pull_strings:    Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:   Whether or not to plan a path that has sufficient "clearance" around it.
+        :param stop_planning:   An optional event that can be used to stop planning if needed.
         :return:                The path, if one was successfully found, or None otherwise.
         """
         # Loosely based on an amalgam of:
@@ -141,8 +151,21 @@ class AStarPathPlanner:
         frontier: PriorityQueue[PathNode, float, type(None)] = PriorityQueue[PathNode, float, type(None)]()
         frontier.insert(source_node, h(source_vpos, goal_vpos), None)
 
+        iterations_till_pause: int = 10
+
         # While the search still has a chance of succeeding:
         while not frontier.empty():
+            # If we're trying to stop planning, early out.
+            if stop_planning is not None and stop_planning.is_set():
+                break
+
+            # Every few iterations, pause for 1 millisecond to give other threads a chance.
+            if iterations_till_pause == 0:
+                time.sleep(0.001)
+                iterations_till_pause = 10
+            else:
+                iterations_till_pause -= 1
+
             # Get the current node to explore from the frontier.
             current_node: PathNode = frontier.top().ident
             current_vpos: np.ndarray = self.__toolkit.node_to_vpos(current_node)
@@ -192,14 +215,13 @@ class AStarPathPlanner:
                     d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                     h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                     allow_shortcuts: bool, pull_strings: bool, use_clearance: bool,
-                    nearest_waypoint_tolerance: float = 0.2) -> Optional[Path]:
+                    waypoint_capture_range: float) -> Optional[Path]:
         """
         Try to update the specified path based on the agent's current position.
 
         .. note::
             Although nothing in this module specifically refers to the measurement units being used, we generally
-            measure distances in metres throughout our code-base. The default tolerance is set with this in mind,
-            i.e. 0.2 is intended to indicate a 20cm tolerance around the nearest waypoint.
+            measure distances in metres throughout our code-base.
 
         :param current_pos:                 The current position of the agent.
         :param path:                        The path to update.
@@ -209,8 +231,8 @@ class AStarPathPlanner:
         :param allow_shortcuts:             Whether to allow shortcutting when the goal is in sight.
         :param pull_strings:                Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:               Whether to take "clearance" around the path into account when updating it.
-        :param nearest_waypoint_tolerance:  The maximum distance to the nearest waypoint for the agent to be
-                                            considered within range of it.
+        :param waypoint_capture_range:      The maximum distance to a waypoint for the agent to be considered within
+                                            range of it.
         :return:                            The updated path, if successful, or None otherwise.
         """
         # Find the nearest waypoint of those on the path up to and including the next essential one.
@@ -235,45 +257,34 @@ class AStarPathPlanner:
         if debug:
             print(f"Distance to nearest waypoint: {nearest_waypoint_dist}")
 
-        # If we're within striking distance of the nearest waypoint:
-        if nearest_waypoint_dist <= nearest_waypoint_tolerance:
-            # Straighten the path up to and including its successor (if any). Note that if the nearest waypoint
-            # is the goal, then the path will be left with only a single waypoint.
+        # If we're within the capture range of the nearest waypoint:
+        if nearest_waypoint_dist <= waypoint_capture_range:
+            # Straighten the path up to and including its successor (if any). Note that iff the nearest waypoint
+            # is the goal, then this will leave the path with only a single waypoint (which is invalid). If that
+            # happens, there's no need for a path any more, and we simply early out.
             path = path.straighten_before(nearest_waypoint_idx + 1)
-        else:
-            # Otherwise, if there's a direct line of sight to the nearest waypoint:
-            current_vpos: np.ndarray = self.__toolkit.pos_to_vpos(current_pos)
-            nearest_waypoint_vpos: np.ndarray = self.__toolkit.pos_to_vpos(path[nearest_waypoint_idx].position)
-            if self.__toolkit.line_segment_is_traversable(
-                current_vpos, nearest_waypoint_vpos, use_clearance=use_clearance
-            ):
-                # Straighten the path up to and including the nearest waypoint.
-                path = path.straighten_before(nearest_waypoint_idx)
-
-        # If the path now has only a single waypoint:
-        if len(path) == 1:
-            # We've reached the goal, so there's no need for a path any more.
-            return None
-        else:
-            # Otherwise, try to plan a new sub-path from the current position to the next waypoint.
-            new_subpath: Optional[Path] = self.plan_single_step_path(
-                current_pos, path[1].position, d=d, h=h,
-                allow_shortcuts=allow_shortcuts, pull_strings=pull_strings, use_clearance=use_clearance
-            )
-
-            # If that succeeded:
-            if new_subpath is not None:
-                # Replace the existing sub-path to the next waypoint with the new one.
-                updated_path: Path = path.replace_before(1, new_subpath)
-
-                # Return the updated path, performing string pulling in the process if requested.
-                if pull_strings:
-                    return self.__toolkit.pull_strings(updated_path, use_clearance=use_clearance)
-                else:
-                    return updated_path
-            else:
-                # If a new sub-path couldn't be found, the path update has failed, so return None.
+            if len(path) == 1:
                 return None
+
+        # Try to plan a new sub-path from the current position to the next waypoint.
+        new_subpath: Optional[Path] = self.plan_single_step_path(
+            current_pos, path[1].position, d=d, h=h,
+            allow_shortcuts=allow_shortcuts, pull_strings=pull_strings, use_clearance=use_clearance
+        )
+
+        # If that succeeded:
+        if new_subpath is not None:
+            # Replace the existing sub-path to the next waypoint with the new one.
+            updated_path: Path = path.replace_before(1, new_subpath, keep_last=False)
+
+            # Return the updated path, performing string pulling in the process if requested.
+            if pull_strings:
+                return self.__toolkit.pull_strings(updated_path, use_clearance=use_clearance)
+            else:
+                return updated_path
+        else:
+            # If a new sub-path couldn't be found, the path update has failed, so return None.
+            return None
 
     # PRIVATE METHODS
 

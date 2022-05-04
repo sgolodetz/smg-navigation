@@ -159,20 +159,27 @@ class Path:
                 glColor3f(*waypoint_colourer(pos))
                 OpenGLUtil.render_sphere(pos, 0.01, slices=10, stacks=10)
 
-    def replace_before(self, waypoint_idx: int, new_subpath: Path) -> Path:
+    def replace_before(self, waypoint_idx: int, new_subpath: Path, *, keep_last: bool) -> Path:
         """
         Make a copy of the path in which the sub-path prior to the specified waypoint has been replaced
         with a new sub-path.
 
         :param waypoint_idx:    The index of the waypoint at the start of the remainder of the path.
         :param new_subpath:     The new sub-path to substitute for the sub-path before the specified waypoint.
+        :param keep_last:       Whether or not to include the last waypoint of the new sub-path.
         :return:                A copy of the path in which the sub-path prior to the specified waypoint has
                                 been replaced with the new sub-path.
         """
-        return Path(
-            np.vstack([new_subpath.positions[:-1], self.__positions[waypoint_idx:]]),
-            np.vstack([new_subpath.essential_flags[:-1], self.__essential_flags[waypoint_idx:]])
-        )
+        if keep_last:
+            return Path(
+                np.vstack([new_subpath.positions, self.__positions[waypoint_idx:]]),
+                np.vstack([new_subpath.essential_flags, self.__essential_flags[waypoint_idx:]])
+            )
+        else:
+            return Path(
+                np.vstack([new_subpath.positions[:-1], self.__positions[waypoint_idx:]]),
+                np.vstack([new_subpath.essential_flags[:-1], self.__essential_flags[waypoint_idx:]])
+            )
 
     def straighten_before(self, waypoint_idx: int) -> Path:
         """
