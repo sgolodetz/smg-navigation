@@ -151,7 +151,8 @@ class AStarPathPlanner:
         frontier: PriorityQueue[PathNode, float, type(None)] = PriorityQueue[PathNode, float, type(None)]()
         frontier.insert(source_node, h(source_vpos, goal_vpos), None)
 
-        iterations_till_pause: int = 10
+        iterations_between_pauses: int = 3
+        iterations_till_pause: int = iterations_between_pauses
 
         # While the search still has a chance of succeeding:
         while not frontier.empty():
@@ -160,11 +161,12 @@ class AStarPathPlanner:
                 break
 
             # Every few iterations, pause for 1 millisecond to give other threads a chance.
+            if iterations_till_pause > 0:
+                iterations_till_pause -= 1
+
             if iterations_till_pause == 0:
                 time.sleep(0.001)
-                iterations_till_pause = 10
-            else:
-                iterations_till_pause -= 1
+                iterations_till_pause = iterations_between_pauses
 
             # Get the current node to explore from the frontier.
             current_node: PathNode = frontier.top().ident

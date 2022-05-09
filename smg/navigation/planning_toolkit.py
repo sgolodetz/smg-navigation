@@ -227,6 +227,41 @@ class PlanningToolkit:
         dest_vpos: np.ndarray = self.node_to_vpos(dest_node)
         return self.line_segment_is_traversable(source_vpos, dest_vpos, use_clearance=use_clearance)
 
+    def find_flat_ground_below(self, pos: np.ndarray, *, step_limit: int = 100) -> Optional[np.ndarray]:
+        """
+        Try to find a 3x3 patch of flat ground below the specified position.
+
+        :param pos:         The specified position.
+        :param step_limit:  The maximum number of downward steps to take during the search.
+        :return:            The centre of the voxel in the middle of the patch (if found), or None otherwise.
+        """
+        # Perform a downwards search from the specified position to find the ground.
+        resolution: float = self.__tree.get_resolution()
+        steps_taken: int = 0
+        test_vpos: np.ndarray = self.pos_to_vpos(pos)
+        test_node: PathNode = self.pos_to_node(test_vpos)
+
+        # Step downwards a voxel at a time until the node being tested is non-traversable.
+        while self.node_is_traversable(
+            test_node, neighbours=PlanningToolkit.neighbours8, use_clearance=True
+        ):
+            # If we hit the step limit or step outside the bounds of the octree, early out.
+            if steps_taken >= step_limit or not self.is_in_bounds(test_vpos):
+                return None
+
+            # Otherwise, keep stepping downwards.
+            test_vpos[1] += resolution
+            test_node = self.pos_to_node(test_vpos)
+            steps_taken += 1
+
+        # Once we've found the ground, check that the surrounding patch is sufficiently flat. If it isn't, return None.
+        for neighbour_node in PlanningToolkit.neighbours8(test_node):
+            if self.node_is_free(neighbour_node):
+                return None
+
+        # If the patch is flat enough, return the centre of its middle voxel.
+        return test_vpos
+
     def get_tree(self) -> OcTree:
         """
         Get the octree associated with the toolkit.
