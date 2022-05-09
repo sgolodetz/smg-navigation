@@ -229,7 +229,7 @@ class PlanningToolkit:
 
     def find_flat_ground_below(self, pos: np.ndarray, *, step_limit: int = 100) -> Optional[np.ndarray]:
         """
-        Try to find a patch of flat ground below the specified position.
+        Try to find a 3x3 patch of flat ground below the specified position.
 
         :param pos:         The specified position.
         :param step_limit:  The maximum number of downward steps to take during the search.
