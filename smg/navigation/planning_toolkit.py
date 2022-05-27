@@ -262,13 +262,13 @@ class PlanningToolkit:
         # If the patch is flat enough, return the centre of its middle voxel.
         return test_vpos
 
-    def get_tree(self) -> OcTree:
+    def get_tree_resolution(self) -> float:
         """
-        Get the octree associated with the toolkit.
+        Get the voxel size (in m) of the octree associated with the toolkit.
 
-        :return:    The octree associated with the toolkit.
+        :return:    The voxel size (in m) of the octree associated with the toolkit.
         """
-        return self.__tree
+        return self.__tree.get_resolution()
 
     def is_in_bounds(self, pos: np.ndarray) -> bool:
         """
