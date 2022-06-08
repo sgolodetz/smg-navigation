@@ -274,7 +274,7 @@ class AStarPathPlanner:
         )
 
         # FIXME: Avoid hard-coding this threshold.
-        if np.linalg.norm(closest_point - current_pos) <= 0.05:
+        if True:  # np.linalg.norm(closest_point - current_pos) <= 0.1:
             return path
 
         # Otherwise, if we've deviated from the existing path, try to plan a new sub-path from the current position
