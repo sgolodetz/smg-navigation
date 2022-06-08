@@ -5,7 +5,7 @@ import threading
 from collections import defaultdict, deque
 from typing import Callable, Deque, Dict, List, Optional
 
-from smg.utility import PriorityQueue
+from smg.utility import GeometryUtil, PriorityQueue
 
 from .path import Path
 from .planning_toolkit import EOccupancyStatus, PathNode, PlanningToolkit
@@ -268,7 +268,17 @@ class AStarPathPlanner:
             if len(path) == 1:
                 return None
 
-        # Try to plan a new sub-path from the current position to the next waypoint.
+        # Now check to see if we're following the existing path closely enough. If we are, early out.
+        closest_point: np.ndarray = GeometryUtil.find_closest_point_on_line_segment(
+            current_pos, path[0].position, path[1].position
+        )
+
+        # FIXME: Avoid hard-coding this threshold.
+        if np.linalg.norm(closest_point - current_pos) <= 0.05:
+            return path
+
+        # Otherwise, if we've deviated from the existing path, try to plan a new sub-path from the current position
+        # to the next waypoint.
         new_subpath: Optional[Path] = self.plan_single_step_path(
             current_pos, path[1].position, d=d, h=h,
             allow_shortcuts=allow_shortcuts, pull_strings=pull_strings, use_clearance=use_clearance
