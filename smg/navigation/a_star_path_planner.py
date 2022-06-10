@@ -268,24 +268,32 @@ class AStarPathPlanner:
             if len(path) == 1:
                 return None
 
-        # Now check to see if we're following the existing path closely enough. If we are, early out.
+        # Now find the closest point on the existing path.
         closest_point: np.ndarray = GeometryUtil.find_closest_point_on_line_segment(
             current_pos, path[0].position, path[1].position
         )
 
+        # If we're close enough to it, we're following the existing path closely enough, so replace the first point
+        # on the path with the closest point, and early out.
         # FIXME: Avoid hard-coding this threshold.
         if np.linalg.norm(closest_point - current_pos) <= 0.05:
-            return path
+            updated_path: Path = path.copy()
+            updated_path.positions[0] = closest_point
+            return updated_path
 
         # Otherwise, if we've deviated from the existing path, try to plan a new sub-path from the current position
-        # to the next waypoint.
-        new_subpath: Optional[Path] = self.plan_single_step_path(
-            current_pos, path[1].position, d=d, h=h,
+        # to the next waypoint that passes through the closest point (this is to ensure that the path changes as
+        # little as possible).
+        new_subpath: Optional[Path] = self.plan_multi_step_path(
+            [current_pos, closest_point, path[1].position], d=d, h=h,
             allow_shortcuts=allow_shortcuts, pull_strings=pull_strings, use_clearance=use_clearance
         )
 
         # If that succeeded:
         if new_subpath is not None:
+            # Mark the closest point as non-essential (this allows it to be pruned by string pulling if possible).
+            new_subpath.essential_flags[1] = False
+
             # Replace the existing sub-path to the next waypoint with the new one.
             updated_path: Path = path.replace_before(1, new_subpath, keep_last=False)
 
