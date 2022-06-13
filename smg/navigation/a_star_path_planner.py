@@ -217,7 +217,7 @@ class AStarPathPlanner:
                     d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                     h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                     allow_shortcuts: bool, pull_strings: bool, use_clearance: bool,
-                    waypoint_capture_range: float) -> Optional[Path]:
+                    path_tracking_range: float, waypoint_capture_range: float) -> Optional[Path]:
         """
         Try to update the specified path based on the agent's current position.
 
@@ -233,6 +233,7 @@ class AStarPathPlanner:
         :param allow_shortcuts:             Whether to allow shortcutting when the goal is in sight.
         :param pull_strings:                Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:               Whether to take "clearance" around the path into account when updating it.
+        :param path_tracking_range:         TODO
         :param waypoint_capture_range:      The maximum distance to a waypoint for the agent to be considered within
                                             range of it.
         :return:                            The updated path, if successful, or None otherwise.
@@ -275,8 +276,7 @@ class AStarPathPlanner:
 
         # If we're close enough to it, we're following the existing path closely enough, so replace the first point
         # on the path with the closest point, and early out.
-        # FIXME: Avoid hard-coding this threshold.
-        if np.linalg.norm(closest_point - current_pos) <= 0.05:
+        if np.linalg.norm(closest_point - current_pos) <= path_tracking_range:
             updated_path: Path = path.copy()
             updated_path.positions[0] = closest_point
             return updated_path
