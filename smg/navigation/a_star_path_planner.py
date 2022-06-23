@@ -293,7 +293,10 @@ class AStarPathPlanner:
         # If that succeeded:
         if new_subpath is not None:
             # Mark the closest point as non-essential (this allows it to be pruned by string pulling if possible).
-            new_subpath.essential_flags[1] = False
+            for i in range(1, len(new_subpath) - 1):
+                if new_subpath.essential_flags[i]:
+                    new_subpath.essential_flags[i] = False
+                    break
 
             # Replace the existing sub-path to the next waypoint with the new one.
             updated_path: Path = path.replace_before(1, new_subpath, keep_last=False)
