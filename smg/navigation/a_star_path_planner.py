@@ -233,7 +233,8 @@ class AStarPathPlanner:
         :param allow_shortcuts:             Whether to allow shortcutting when the goal is in sight.
         :param pull_strings:                Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:               Whether to take "clearance" around the path into account when updating it.
-        :param path_tracking_range:         TODO
+        :param path_tracking_range:         The maximum distance to the current path segment for the agent to be
+                                            considered within range of the path (making re-planning unnecessary).
         :param waypoint_capture_range:      The maximum distance to a waypoint for the agent to be considered within
                                             range of it.
         :return:                            The updated path, if successful, or None otherwise.
