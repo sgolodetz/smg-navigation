@@ -217,7 +217,7 @@ class AStarPathPlanner:
                     d: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                     h: Optional[Callable[[np.ndarray, np.ndarray], float]] = None,
                     allow_shortcuts: bool, pull_strings: bool, use_clearance: bool,
-                    waypoint_capture_range: float) -> Optional[Path]:
+                    path_tracking_range: float, waypoint_capture_range: float) -> Optional[Path]:
         """
         Try to update the specified path based on the agent's current position.
 
@@ -233,6 +233,8 @@ class AStarPathPlanner:
         :param allow_shortcuts:             Whether to allow shortcutting when the goal is in sight.
         :param pull_strings:                Whether to perform string pulling on the path prior to returning it.
         :param use_clearance:               Whether to take "clearance" around the path into account when updating it.
+        :param path_tracking_range:         The maximum distance to the current path segment for the agent to be
+                                            considered within range of the path (making re-planning unnecessary).
         :param waypoint_capture_range:      The maximum distance to a waypoint for the agent to be considered within
                                             range of it.
         :return:                            The updated path, if successful, or None otherwise.
@@ -268,24 +270,34 @@ class AStarPathPlanner:
             if len(path) == 1:
                 return None
 
-        # Now check to see if we're following the existing path closely enough. If we are, early out.
+        # Now find the closest point on the existing path.
         closest_point: np.ndarray = GeometryUtil.find_closest_point_on_line_segment(
             current_pos, path[0].position, path[1].position
         )
 
-        # FIXME: Avoid hard-coding this threshold.
-        if True:  # np.linalg.norm(closest_point - current_pos) <= 0.1:
-            return path
+        # If we're close enough to it, we're following the existing path closely enough, so replace the first point
+        # on the path with the closest point, and early out.
+        if np.linalg.norm(closest_point - current_pos) <= path_tracking_range:
+            updated_path: Path = path.copy()
+            updated_path.positions[0] = closest_point
+            return updated_path
 
         # Otherwise, if we've deviated from the existing path, try to plan a new sub-path from the current position
-        # to the next waypoint.
-        new_subpath: Optional[Path] = self.plan_single_step_path(
-            current_pos, path[1].position, d=d, h=h,
+        # to the next waypoint that passes through the closest point (this is to ensure that the path changes as
+        # little as possible).
+        new_subpath: Optional[Path] = self.plan_multi_step_path(
+            [current_pos, closest_point, path[1].position], d=d, h=h,
             allow_shortcuts=allow_shortcuts, pull_strings=pull_strings, use_clearance=use_clearance
         )
 
         # If that succeeded:
         if new_subpath is not None:
+            # Mark the closest point as non-essential (this allows it to be pruned by string pulling if possible).
+            for i in range(1, len(new_subpath) - 1):
+                if new_subpath.essential_flags[i]:
+                    new_subpath.essential_flags[i] = False
+                    break
+
             # Replace the existing sub-path to the next waypoint with the new one.
             updated_path: Path = path.replace_before(1, new_subpath, keep_last=False)
 
