@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from OpenGL.GL import *
-from scipy.interpolate import Akima1DInterpolator
+from scipy.interpolate import CubicHermiteSpline
 from typing import Callable, Optional
 
 from smg.opengl import OpenGLUtil
@@ -116,11 +116,36 @@ class Path:
         :param new_length:  The number of points to take from the interpolating curve.
         :return:            The interpolated path.
         """
+        # TODO: Comment here.
+        # noinspection PyShadowingNames
         x: np.ndarray = np.arange(len(self))
-        cs: Akima1DInterpolator = Akima1DInterpolator(x, self.__positions)
-        essential_flags: np.ndarray = np.zeros((new_length, 1), dtype=bool)
-        essential_flags[0] = essential_flags[-1] = True
-        return Path(cs(np.linspace(0, len(self) - 1, new_length)), essential_flags)
+        gradients: np.ndarray = np.zeros_like(self.__positions)
+        for i in range(1, len(self.__positions) - 1):
+            gradients[i] = (self.__positions[i+1] - self.__positions[i-1]) / 2
+
+        cs: CubicHermiteSpline = CubicHermiteSpline(x, self.__positions, gradients)
+
+        # TODO: Comment here.
+        while True:
+            # TODO: Comment here.
+            interpolated_path: Path = self.__make_interpolated_path(cs, new_length)
+
+            # TODO: Comment here.
+            gap_sum: float = 0.0
+            for i in range(0, new_length - 1):
+                gap_sum += np.linalg.norm(interpolated_path.positions[i+1] - interpolated_path.positions[i])
+
+            gap_mean: float = gap_sum / len(interpolated_path)
+
+            # TODO: Comment here.
+            if gap_mean >= 0.05 or new_length <= 4:
+                break
+
+            # TODO: Comment here.
+            else:
+                new_length //= 2
+
+        return interpolated_path
 
     def render(self, *, start_colour, end_colour, width: int = 1,
                waypoint_colourer: Optional[Callable[[np.ndarray], np.ndarray]] = None) -> None:
@@ -193,3 +218,17 @@ class Path:
             np.vstack([self.__positions[0], self.__positions[waypoint_idx:]]),
             np.vstack([self.__essential_flags[0], self.__essential_flags[waypoint_idx:]])
         )
+
+    # PRIVATE METHODS
+
+    def __make_interpolated_path(self, cs: CubicHermiteSpline, new_length: int) -> Path:
+        """
+        TODO
+
+        :param cs:          TODO
+        :param new_length:  TODO
+        :return:            TODO
+        """
+        essential_flags: np.ndarray = np.zeros((new_length, 1), dtype=bool)
+        essential_flags[0] = essential_flags[-1] = True
+        return Path(cs(np.linspace(0, len(self) - 1, new_length)), essential_flags)
