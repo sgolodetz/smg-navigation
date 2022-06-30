@@ -229,6 +229,7 @@ class Path:
         :param new_length:  TODO
         :return:            TODO
         """
-        essential_flags: np.ndarray = np.zeros((new_length, 1), dtype=bool)
-        essential_flags[0] = essential_flags[-1] = True
+        # essential_flags: np.ndarray = np.zeros((new_length, 1), dtype=bool)
+        # essential_flags[0] = essential_flags[-1] = True
+        essential_flags: np.ndarray = np.full((new_length, 1), True, dtype=bool)
         return Path(cs(np.linspace(0, len(self) - 1, new_length)), essential_flags)
