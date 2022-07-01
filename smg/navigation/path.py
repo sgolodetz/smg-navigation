@@ -125,14 +125,19 @@ class Path:
         """
         return Path(self.__positions.copy(), self.__essential_flags.copy())
 
-    def interpolate(self, *, new_length: int = 100) -> Path:
+    def interpolate(self, *, min_gap_mean: float = 0.05, new_length: int = 100) -> Path:
         """
-        Make a smoother version of the path by using curve fitting and interpolation.
+        Make a smoother version of the path by using spline fitting and interpolation.
 
-        :param new_length:  The number of points to take from the interpolating curve.
-        :return:            The interpolated path.
+        .. note::
+            The specified number of points to take will be reduced if necessary to try to achieve the specified
+            minimum average gap.
+
+        :param min_gap_mean:    The minimum average gap wanted between adjacent points on the interpolated path.
+        :param new_length:      The initial number of points to take from the interpolating spline.
+        :return:                The interpolated path.
         """
-        # TODO: Comment here.
+        # Fit a Hermite spline to the current path, setting the gradients needed to something sensible.
         # noinspection PyShadowingNames
         x: np.ndarray = np.arange(len(self))
         gradients: np.ndarray = np.zeros_like(self.__positions)
@@ -141,23 +146,25 @@ class Path:
 
         cs: CubicHermiteSpline = CubicHermiteSpline(x, self.__positions, gradients)
 
-        # TODO: Comment here.
+        # Until we get an interpolated path that we're happy with:
         while True:
-            # TODO: Comment here.
+            # Interpolate the path by sampling a fixed number of points along the spline.
             interpolated_path: Path = self.__make_interpolated_path(cs, new_length)
 
-            # TODO: Comment here.
+            # Calculate the average gap between adjacent points on the interpolated path.
             gap_sum: float = 0.0
             for i in range(0, new_length - 1):
                 gap_sum += np.linalg.norm(interpolated_path.positions[i+1] - interpolated_path.positions[i])
 
             gap_mean: float = gap_sum / len(interpolated_path)
 
-            # TODO: Comment here.
-            if gap_mean >= 0.05 or new_length <= 4:
+            # If either (i) the average gap is greater than the minimum we specified, or (ii) the number of points
+            # to take from the interpolating spline would be too small if we reduced it any further, accept the
+            # interpolated path and exit. (The "4" was chosen somewhat arbitrarily here, but seems to work ok.)
+            if gap_mean >= min_gap_mean or new_length <= 4:
                 break
 
-            # TODO: Comment here.
+            # Otherwise, halve the number of points to take from the interpolating spline and try again.
             else:
                 new_length //= 2
 
@@ -239,13 +246,12 @@ class Path:
 
     def __make_interpolated_path(self, cs: CubicHermiteSpline, new_length: int) -> Path:
         """
-        TODO
+        Make an interpolated version of the current path by sampling the specified number of points from a spline
+        that has been fitted to it.
 
-        :param cs:          TODO
-        :param new_length:  TODO
-        :return:            TODO
+        :param cs:          The spline.
+        :param new_length:  The number of points to sample.
+        :return:            The interpolated version of the current path.
         """
-        # essential_flags: np.ndarray = np.zeros((new_length, 1), dtype=bool)
-        # essential_flags[0] = essential_flags[-1] = True
         essential_flags: np.ndarray = np.full((new_length, 1), True, dtype=bool)
         return Path(cs(np.linspace(0, len(self) - 1, new_length)), essential_flags)
