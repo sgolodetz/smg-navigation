@@ -105,8 +105,24 @@ class Path:
 
     # PUBLIC METHODS
 
+    def arc_length(self) -> float:
+        """
+        Calculate the arc length of the path (in m).
+
+        :return:    The arc length of the path (in m).
+        """
+        result: float = 0.0
+        for i in range(len(self.__positions) - 1):
+            result += np.linalg.norm(self.__positions[i+1] - self.__positions[i])
+
+        return result
+
     def copy(self) -> Path:
-        """Make a copy of the path."""
+        """
+        Make a copy of the path.
+
+        :return:    A copy of the path.
+        """
         return Path(self.__positions.copy(), self.__essential_flags.copy())
 
     def interpolate(self, *, new_length: int = 100) -> Path:
