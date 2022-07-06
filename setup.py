@@ -1,7 +1,7 @@
 import setuptools
 
-# with open("README.md", "r") as fh:
-#     long_description = fh.read()
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
 setuptools.setup(
     name="smg-navigation",
@@ -9,13 +9,12 @@ setuptools.setup(
     author="Stuart Golodetz",
     author_email="stuart.golodetz@cs.ox.ac.uk",
     description="Navigation algorithms",
-    long_description="",  #long_description,
+    long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/sgolodetz/smg-navigation",
     packages=["smg.navigation"],
     include_package_data=True,
     install_requires=[
-        "smg-opengl",
         "smg-pyoctomap"
     ],
     classifiers=[
